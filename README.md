@@ -1,4 +1,5 @@
 # OSIF 
+This CLI framework is based on sploitkit and is an attempt to gather OSINT Tools. For the ease of use, the interface has a layout that looks like Metasploit.
 
 # Installation
 
