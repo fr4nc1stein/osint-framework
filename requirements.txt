@@ -3,5 +3,7 @@ terminaltables
 twint
 vt-py
 python-dotenv
-
+sublist3r
+dnspython
+win_unicode_console
 

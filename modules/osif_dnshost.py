@@ -3,7 +3,7 @@ import requests
 from terminaltables import SingleTable
 
 class dnsHost(Module):
-    """ This module find DNS information
+    """ This module find DNS Host information
     Author:  laet4x
     Version: 1.0
     """
