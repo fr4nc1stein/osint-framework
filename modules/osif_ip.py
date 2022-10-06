@@ -4,7 +4,7 @@ import json
 from terminaltables import SingleTable
 
 class osifIp(Module):
-    """ This module find leaked info using ihavebeenpwnd
+    """ This module find IP information
     Author:  laet4x
     Version: 1.0
     """
