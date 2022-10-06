@@ -5,7 +5,7 @@ from terminaltables import SingleTable
 import twint
 from datetime import datetime
 
-class osifTwitter(Module):
+class twitterSearch(Module):
     """ This module find twitter account
     Author:  laet4x
     Version: 1.0

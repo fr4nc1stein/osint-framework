@@ -3,7 +3,7 @@ import requests
 import json
 from terminaltables import SingleTable
 
-class osifIp(Module):
+class iplookup(Module):
     """ This module find IP information
     Author:  laet4x
     Version: 1.0

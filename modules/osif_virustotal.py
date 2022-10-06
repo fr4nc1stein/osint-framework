@@ -4,7 +4,7 @@ from terminaltables import SingleTable
 import os
 import vt
 
-class osifVirusTotal(Module):
+class virusTotal(Module):
     load_dotenv()
     """ This module scan HASH or URL using VT
     Author:  laet4x
