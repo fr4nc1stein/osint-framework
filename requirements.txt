@@ -1,0 +1,4 @@
+sploitkit
+requests
+pyobjc-core;platform_system=="Darwin"
+pyobjc;platform_system=="Darwin"
