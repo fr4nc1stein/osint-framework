@@ -31,7 +31,7 @@ class osifIp(Module):
         status = values['status']
 
         if status != "success":
-            print(warning+" Adresse IP invalide.")
+            print(" Address IP invalid.")
 
         else:
             infos = ("IP", ip)
@@ -51,7 +51,7 @@ class osifIp(Module):
             localisation = str(values['lat'])+', '+str(values['lon'])
             infos = ("Localisation", localisation)
             TABLE_DATA.append(infos)
-            infos = ("Maps", "https://www.google.fr/maps?q="+localisation)
+            infos = ("Maps", "https://www.google.com/maps?q="+localisation)
             TABLE_DATA.append(infos)
 
             table = SingleTable(TABLE_DATA, ip)
