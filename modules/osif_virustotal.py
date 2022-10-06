@@ -5,6 +5,7 @@ import os
 import vt
 
 class osifVirusTotal(Module):
+    load_dotenv()
     """ This module scan HASH or URL using VT
     Author:  laet4x
     Version: 1.0
@@ -15,33 +16,41 @@ class osifVirusTotal(Module):
             "Provide your target IP",
             True,
         ): str("server.dotomater.club"),
+         Option(
+            'VT_API',
+            "Virustotal API Key from .env",
+            True,
+        ): str(os.getenv('VT_API')),
     })    
 
     def run(self):
         TABLE_DATA = []
-        load_dotenv()
+        # ROOT_DIR = os.path.abspath(os.curdir)
         VT_API = os.getenv('VT_API')
-        url = self.config.option('URL').value
+        if(VT_API == ""):
+            print(".env VT_API are empty")
+        else:
+            url = self.config.option('URL').value
 
-        client = vt.Client(VT_API)
-        url_id = vt.url_id(url)
-        url_vt = client.get_object("/urls/{}", url_id)
-        print("\n"" Analyzing '%s'..." % (url))
-        
-        infos = ("URL", url)
-        TABLE_DATA.append(infos)
-        
-        infos = ("HARMLESS", url_vt.last_analysis_stats['harmless'])
-        TABLE_DATA.append(infos)
-        
-        infos = ("MALICIOUS",  url_vt.last_analysis_stats['malicious'])
-        TABLE_DATA.append(infos)
+            client = vt.Client(VT_API)
+            url_id = vt.url_id(url)
+            url_vt = client.get_object("/urls/{}", url_id)
+            print("\n"" Analyzing '%s'..." % (url))
             
-        infos = ("SUSPICIOUS",  url_vt.last_analysis_stats['suspicious'])
-        TABLE_DATA.append(infos)
+            infos = ("URL", url)
+            TABLE_DATA.append(infos)
+            
+            infos = ("HARMLESS", url_vt.last_analysis_stats['harmless'])
+            TABLE_DATA.append(infos)
+            
+            infos = ("MALICIOUS",  url_vt.last_analysis_stats['malicious'])
+            TABLE_DATA.append(infos)
+                
+            infos = ("SUSPICIOUS",  url_vt.last_analysis_stats['suspicious'])
+            TABLE_DATA.append(infos)
 
-        infos = ("UNDETECTED",  url_vt.last_analysis_stats['undetected'])
-        TABLE_DATA.append(infos)
+            infos = ("UNDETECTED",  url_vt.last_analysis_stats['undetected'])
+            TABLE_DATA.append(infos)
 
-        table = SingleTable(TABLE_DATA, url)
-        print("\n"+table.table)
+            table = SingleTable(TABLE_DATA, url)
+            print("\n"+table.table)
