@@ -1,7 +1,7 @@
 version: '2'
 services:
   osif:
-    image: osif:tag
+    image: osif:latest
     build:
       context: ./.
       dockerfile: Dockerfile
