@@ -2,9 +2,12 @@
 This CLI framework is based on sploitkit and is an attempt to gather OSINT Tools. For the ease of use, the interface has a layout that looks like Metasploit.
 
 # Docker Installation (Recommended)
-### Docker-Compose
-### Where to get Docker Compose
 
+### Docker installation
+Get [Docker ](https://www.docker.com/products/docker-desktop)https://docs.docker.com/get-docker/
+for Windows, Linux and MacOS
+
+### Where to get Docker Compose
 ### Windows and macOS
 Docker Compose is included in
 [Docker Desktop](https://www.docker.com/products/docker-desktop)
