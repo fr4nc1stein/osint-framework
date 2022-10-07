@@ -22,6 +22,12 @@ You can download Docker Compose binaries from the
 2. docker exec -ti osif bash
 3. python3 -B main.py
 
+If not started, follow this instruction below:
+```
+docker build --no-cache  --tag osif .
+docker run -ti osif bash
+```
+
 
 
 # Installation
@@ -88,12 +94,3 @@ osif dns(dns_records) >
 
 # Author
 Al Francis 
-
-
-# FAQ
-1. The container didnt run after docker-compose up -d
-Answer: Try to rebuild using
-```
-docker build --no-cache  --tag osif .
-docker run -ti osif bash
-```

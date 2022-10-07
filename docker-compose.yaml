@@ -3,9 +3,10 @@ services:
   osif:
     image: osif:latest
     build:
-      context: ./.
+      context: .
       dockerfile: Dockerfile
     container_name: osif
+    tty: true
     command: python3 -B main.py
     volumes:
      - .:/osif
