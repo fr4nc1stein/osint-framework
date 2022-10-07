@@ -16,7 +16,7 @@ class dnsHost(Module):
         ): str("google.com"),
     })    
 
-    #path = "auxiliary/dns"
+    #path = "dns"
 
     def run(self):
         domain = self.config.option('DOMAIN').value

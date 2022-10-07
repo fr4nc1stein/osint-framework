@@ -8,11 +8,6 @@ class OsifConsole(FrameworkConsole):
     exclude = ["root/test", "root/help"]
     sources = {'banners': "banners"}
     
-    def at_exit():
-        subprocess.call("service network-manager restart", shell=True)
-        if not args.dev:
-            subprocess.call("reset", shell=True)
-
 __all__ = ["OsifConsole"]
 __script__ = "osif"
 __doc__    = """
