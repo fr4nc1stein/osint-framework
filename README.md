@@ -46,66 +46,76 @@ CENSYS_SECRET=""
 
 
 ```
-─$ python3 main.py 
-
-                                                   _|_|      _|_|_|  _|_|_|  _|_|_|_|
-                                                  _|    _|  _|          _|    _|      
-                                                  _|    _|    _|_|      _|    _|_|_|  
-                                                  _|    _|        _|    _|    _|
-                                                    _|_|    _|_|_|    _|_|_|  _|
+─$ python3 -B main.py 
 
 
+                                                         ##     ####   #####   ######
+                                                        #  #   #    #    #     #
+                                                       #    #  #         #     #
+                                                       #    #   ####     #     ####
+                                                       #    #       #    #     #
+                                                        #  #   #    #    #     #
+                                                         ##     ####   #####   #
 
 
-                                                      #######   #####   ###  #######                                                       
-                                                      #     #  #     #   #   #
-                                                      #     #  #         #   #
-                                                      #     #   #####    #   #####
-                                                      #     #        #   #   #
-                                                      #     #  #     #   #   #
-                                                      #######   #####   ###  #
-
-                                                            >> OSINT Framework
-                                                                >> @laet4x
 
 
-        -=[ 3 uncategorized ]=-
+                                           ....                ...             .....     .      .....                                      
+                                                    .x~X88888Hx.        .x888888hx    :   .d88888Neu. 'L  .H8888888x.  '`+                 
+                                                   H8X 888888888h.     d88888888888hxx    F""""*8888888F :888888888888x.  !                
+                                                  8888:`*888888888:   8" ... `"*8888%`   *      `"*88*"  8~    `"*88888888"                
+                                                   88888:        `%8  !  "   ` .xnxx.      -....    ue=:. !      .  `f""""                 
+                                                . `88888          ?> X X   .H8888888%:           :88N  `  ~:...-` :8L <)88:                
+                                                `. ?888%           X X 'hn8888888*"   >          9888L       .   :888:>X88!                
+                                                  ~*??.            > X: `*88888%`     !   uzu.   `8888L   :~"88x 48888X ^`                 
+                                                  .x88888h.        <  '8h.. ``     ..x8> ,""888i   ?8888  <  :888k'88888X                  
+                                                 :"""8888888x..  .x    `88888888888888f  4  9888L   %888>   d8888f '88888X                 
+                                                `    `*888888888"      '%8888888888*"   '  '8888   '88%   :8888!    ?8888>                 
+                                                        ""***""           ^"****""`          "*8Nu.z*"    X888!      8888~                 
+                                                                                                           '888       X88f                 
+                                                                                                            '%8:     .8*"                  
+                                                                                                                ^----~"`                   
+                                                             >> OSINT Framework                                                            
+                                                                 >> @laet4x                                                                
+                                                                                                                                           
+ 
+
+        -=[ 1 api           ]=-
+        -=[ 2 dns           ]=-
+        -=[ 1 social        ]=-
+        -=[ 1 subdomain     ]=-
+        -=[ 1 uncategorized ]=-
 
 [!] There are some issues ; use 'show issues' to see more details
-osif > show modules                                                                                                                        
-
-Uncategorized modules
-=====================
-
-   Name              Path  Enabled  Description
-   ----              ----  -------  -----------
-   osif_ip           .     Y        This module find IP information
-   osif_twitter      .     Y        This module find twitter account
-   osif_virus_total  .     Y        This module scan HASH or URL using VT
-
-osif > use osif_virus_total                                                                                                                
-osif (osif_virus_total) > show options                                                                                                     
+osif > use dns/dns_records                                                                                                                 
+osif dns(dns_records) > show options                                                                                                       
 
 Module options
 ==============
 
-   Name  Value                  Required  Description
-   ----  -----                  --------  -----------
-   URL   server.dotomater.club  Y         Provide your target IP 
+   Name    Value       Required  Description                
+   ----    -----       --------  -----------                
+   DOMAIN  google.com  Y         Provide your target Domain 
 
-osif (osif_virus_total) > run                                                                                                              
+osif dns(dns_records) > set DOMAIN laet4x.com                                                                                              
+[+] DOMAIN => laet4x.com
+osif dns(dns_records) > run                                                                                                                
 
- Analyzing 'server.dotomater.club'...
+ Analyzing 'laet4x.com'...
 
-┌server.dotomater.club───────────────┐
-│ URL        │ server.dotomater.club │
-├────────────┼───────────────────────┤
-│ HARMLESS   │ 62                    │
-│ MALICIOUS  │ 17                    │
-│ SUSPICIOUS │ 0                     │
-│ UNDETECTED │ 9                     │
-└────────────┴───────────────────────┘
-osif (osif_virus_total) > 
+ A : 172.67.188.86
+A : 104.21.48.231
+AAAA : 2606:4700:3030::6815:30e7
+AAAA : 2606:4700:3033::ac43:bc56
+MX : 10 eforward1.registrar-servers.com.
+MX : 10 eforward2.registrar-servers.com.
+MX : 10 eforward3.registrar-servers.com.
+MX : 15 eforward4.registrar-servers.com.
+MX : 20 eforward5.registrar-servers.com.
+NS : drew.ns.cloudflare.com.
+NS : zelda.ns.cloudflare.com.
+SOA : drew.ns.cloudflare.com. dns.cloudflare.com. 2289666711 10000 2400 604800 3600
+osif dns(dns_records) >  
 
 ```
 ## If you love OSIF you can buy me a coffee to support this project :)
