@@ -7,6 +7,19 @@ This CLI framework is based on sploitkit and is an attempt to gather OSINT Tools
 2. docker exec -ti osif bash
 3. python3 -B main.py
 
+# Where to get Docker Compose
+
+### Windows and macOS
+
+Docker Compose is included in
+[Docker Desktop](https://www.docker.com/products/docker-desktop)
+for Windows and macOS.
+
+### Linux
+
+You can download Docker Compose binaries from the
+[release page](https://github.com/docker/compose/releases) on this repository.
+
 # Installation
 Recommended on linux or kali
 ```
