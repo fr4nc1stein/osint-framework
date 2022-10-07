@@ -1,8 +1,9 @@
-from sploitkit import Module, Config, Option
+from sploitkit import Module, Config, Option, Command
 import requests
 from terminaltables import SingleTable
 
 class dnsHost(Module):
+    # Command.set_style("module")
     """ This module find DNS Host information
     Author:  laet4x
     Version: 1.0
