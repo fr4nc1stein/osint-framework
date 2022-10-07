@@ -95,4 +95,5 @@ Al Francis
 Answer: Try to rebuild using
 ```
 docker build --no-cache  --tag osif .
+docker run -ti osif bash
 ```

@@ -7,7 +7,5 @@ services:
       dockerfile: Dockerfile
     container_name: osif
     command: python3 -B main.py
-    environment:
-      - "PYTHONPATH=/osif"
     volumes:
      - .:/osif
