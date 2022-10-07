@@ -2,7 +2,7 @@ from sploitkit import *
 import requests
 from terminaltables import SingleTable
 
-class dns(Module):
+class dnsRecords(Module):
     """ This module find DNS information
     Author:  laet4x
     Version: 1.0
@@ -13,7 +13,7 @@ class dns(Module):
             "Provide your target Domain",
             True,
         ): str("google.com"),
-    })    
+    })
 
     def run(self):
         domain = self.config.option('DOMAIN').value
@@ -21,5 +21,7 @@ class dns(Module):
         request = requests.get("https://api.hackertarget.com/dnslookup/?q=" + domain)
         res = request.text
         print("\n", res)
+
+
         
 

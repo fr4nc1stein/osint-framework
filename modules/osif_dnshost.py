@@ -1,4 +1,4 @@
-from sploitkit import *
+from sploitkit import Module, Config, Option
 import requests
 from terminaltables import SingleTable
 
@@ -14,6 +14,8 @@ class dnsHost(Module):
             True,
         ): str("google.com"),
     })    
+
+    #path = "auxiliary/dns"
 
     def run(self):
         domain = self.config.option('DOMAIN').value
