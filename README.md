@@ -20,7 +20,16 @@ CENSYS_APPID=""
 CENSYS_SECRET=""
 ```
 
+# Docker Installation
+### Docker-Compose
+1. docker-compose up -d
+2. docker exec -ti osif bash
+3. python3 -B main.py
+
+### Docker Build
+
 # Sample framework usage:
+1. docker build --tag osif .
 
 ```
 ─$ python3 main.py 

@@ -1,0 +1,13 @@
+version: '2'
+services:
+  osif:
+    image: osif:tag
+    build:
+      context: ./.
+      dockerfile: Dockerfile
+    container_name: osif
+    command: python3 -B main.py
+    environment:
+      - "PYTHONPATH=/osif"
+    volumes:
+     - .:/osif
