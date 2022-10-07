@@ -1,8 +1,14 @@
 # OSIF 
 This CLI framework is based on sploitkit and is an attempt to gather OSINT Tools. For the ease of use, the interface has a layout that looks like Metasploit.
 
-# Installation
+# Docker Installation (Recommended)
+### Docker-Compose
+1. docker-compose up -d
+2. docker exec -ti osif bash
+3. python3 -B main.py
 
+# Installation
+Recommended on linux or kali
 ```
 git clone https://github.com/fr4nc1stein/osint-framework osif
 cd osif
@@ -20,16 +26,7 @@ CENSYS_APPID=""
 CENSYS_SECRET=""
 ```
 
-# Docker Installation
-### Docker-Compose
-1. docker-compose up -d
-2. docker exec -ti osif bash
-3. python3 -B main.py
 
-### Docker Build
-
-# Sample framework usage:
-1. docker build --tag osif .
 
 ```
 ─$ python3 main.py 
