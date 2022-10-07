@@ -4,7 +4,7 @@ This CLI framework is based on sploitkit and is an attempt to gather OSINT Tools
 # Docker Installation (Recommended)
 
 ### Docker installation
-Get [Docker ](https://www.docker.com/products/docker-desktop)https://docs.docker.com/get-docker/)
+Get [Docker](https://docs.docker.com/get-docker/)
 for Windows, Linux and MacOS
 
 ### Where to get Docker Compose
