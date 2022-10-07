@@ -5,11 +5,11 @@ import os
 import vt
 
 class virusTotal(Module):
-    load_dotenv()
     """ This module scan HASH or URL using VT
     Author:  laet4x
     Version: 1.0
     """
+    load_dotenv()
     config = Config({
         Option(
             'URL',

@@ -1,6 +1,5 @@
 from sploitkit import *
 import requests
-import json
 from terminaltables import SingleTable
 
 class dns(Module):

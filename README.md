@@ -13,8 +13,11 @@ pip3 install -r requirements.txt
 
 Create .env
 1. Virustotal API
+2. CENSYS API
 ```
-VT_API=
+VT_API=""
+CENSYS_APPID=""
+CENSYS_SECRET=""
 ```
 
 # Sample framework usage:
