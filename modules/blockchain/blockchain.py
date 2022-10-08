@@ -31,8 +31,8 @@ class ethereumWalletBalance(Module):
     })
 
     def prerun(self):
-        if(self.BLOCKCHAIN_API_KEY_ID == "" and self.BLOCKCHAIN_API_SECRET_KEY == ""):
-            print("Error: .env BLOCKCHAIN_API_KEY_ID and BLOCKCHAIN_API_SECRET_KEY are empty")
+        if(self.BLOCKCHAIN_API_KEY_ID == "" or self.BLOCKCHAIN_API_SECRET_KEY == ""):
+            print("Error: .env BLOCKCHAIN_API_KEY_ID or BLOCKCHAIN_API_SECRET_KEY are empty")
             raise Exception("Fill in your key ID pair!")
      
     def run(self):
