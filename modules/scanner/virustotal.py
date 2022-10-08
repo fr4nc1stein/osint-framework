@@ -4,7 +4,7 @@ from terminaltables import SingleTable
 import os
 import vt
 
-class virusTotal(Module):
+class virusTotalUrlScan(Module):
     """ This module scan HASH or URL using VT
     Author:  laet4x
     Version: 1.0
@@ -16,11 +16,6 @@ class virusTotal(Module):
             "Provide your target IP",
             True,
         ): str("server.dotomater.club"),
-         Option(
-            'VT_API',
-            "Virustotal API Key from .env",
-            True,
-        ): str(os.getenv('VT_API')),
     })    
 
     def run(self):
