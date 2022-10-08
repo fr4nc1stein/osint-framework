@@ -20,11 +20,11 @@ if __name__ == '__main__':
     initialize(exit_at_interrupt=False)
     
     #add traceback   
-    sys.tracebacklimit=0
+    #sys.tracebacklimit=0
 
     #disable _pycachce_
     sys.dont_write_bytecode = True
-    
+
     c = OsifConsole(
         "OSIF",
         #TODO: configure your console settings
