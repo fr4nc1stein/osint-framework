@@ -20,12 +20,13 @@ You can download Docker Compose binaries from the
 ### Run osif with docker and docker-compose
 1. docker-compose up -d
 2. docker exec -ti osif bash
-3. python3 -B main.py
+3. ./osif
 
 If not started, follow this instruction below:
 ```
 docker build --no-cache  --tag osif .
 docker run -ti osif bash
+./osif
 ```
 
 
