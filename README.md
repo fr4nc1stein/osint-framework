@@ -47,6 +47,8 @@ Create .env
 3. BLOCHAIN https://blockchainapi.com/#pricing
 4. ABUSECH https://bazaar.abuse.ch/ (not required)
 5. SHODAN API https://account.shodan.io/
+6. FULLHUNT API (not working)
+7. HUNTER API https://hunter.io/api-keys
 ```
 VT_API=""
 CENSYS_APPID=""
@@ -54,6 +56,9 @@ CENSYS_SECRET=""
 BLOCKCHAIN_API_KEY_ID = ""
 BLOCKCHAIN_API_SECRET_KEY = ""
 ABUSECH_API_KEY = ""
+SHODAN_API_KEY = ""
+FULLHUNT_API_KEY = ""
+HUNTER_API_KEY = ""
 ```
 
 
