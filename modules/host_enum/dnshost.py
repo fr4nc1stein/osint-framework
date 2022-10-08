@@ -13,7 +13,7 @@ class dnsHost(Module):
             'DOMAIN',
             "Provide your target Domain",
             True,
-        ): str("google.com"),
+        ): str("laet4x.com"),
     })    
 
     def run(self):

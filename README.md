@@ -41,10 +41,11 @@ pip3 install -r requirements.txt
 # Configuration
 
 Create .env
-1. Virustotal API
-2. CENSYS API
+1. Virustotal API https://www.virustotal.com/
+2. CENSYS API https://accounts.censys.io/
 3. BLOCHAIN https://blockchainapi.com/#pricing
 4. ABUSECH https://bazaar.abuse.ch/ (not required)
+5. SHODAN API https://account.shodan.io/
 ```
 VT_API=""
 CENSYS_APPID=""

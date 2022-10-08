@@ -13,7 +13,7 @@ class iplookup(Module):
             'IP',
             "Provide your target IP",
             True,
-        ): str("122.53.219.50"),
+        ): str("136.158.41.95"),
     })    
 
     def run(self):

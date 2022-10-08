@@ -2,6 +2,7 @@ from sploitkit import Module, Config, Option, Command
 from dotenv import load_dotenv
 import os
 from theblockchainapi import BlockchainAPIResource, Blockchain, BlockchainNetwork, Wallet
+from terminaltables import SingleTable
 
 class ethereumWalletBalance(Module):
     """ This module find Wallet Balance
@@ -36,10 +37,20 @@ class ethereumWalletBalance(Module):
             raise Exception("Fill in your key ID pair!")
      
     def run(self):
+        TABLE_DATA = []
         address = self.config.option('ADDRESS').value
         result = self.BLOCKCHAIN_API_RESOURCE.get_balance(address, unit=self.UNIT)
-        print(f"Balance of {address}")
-        print(result)
+        infos = ("ADDRESS", address)
+        TABLE_DATA.append(infos)
+        count = 1
+        for key in result:
+            infos = (key, result[key])
+            TABLE_DATA.append(infos)
+            count +=1
+        table = SingleTable(TABLE_DATA, "BALANCE")
+        print("\n"+table.table)    
+        # print(f"Balance of {address}")
+        # print(result)
 
 class ethereumNameIdentifier(Module):
     """ This module find ENS of Address

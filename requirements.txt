@@ -8,3 +8,5 @@ win_unicode_console
 censys
 theblockchainapi
 malwarebazaar
+python-Wappalyzer
+shodan

@@ -1,33 +1,34 @@
 from sploitkit import *
-from dotenv import load_dotenv
-from terminaltables import SingleTable
 import os
-import json
-from malwarebazaar.api import Bazaar
+from dotenv import load_dotenv
+from shodan import Shodan
 from pygments import highlight, lexers, formatters
+import json
 
-class abusechScan(Module):
-    """ This module scan HASH or URL using VT
+class shodanSearch(Module):
+    """ This module find Host Information using Shodan
     Author:  laet4x
     Version: 1.0
     """
     load_dotenv()
-    ABUSECH_API_KEY = os.getenv('ABUSECH_API_KEY')
-    bazaar = Bazaar(ABUSECH_API_KEY)
+    SHODAN_API = os.getenv('SHODAN_API_KEY')
+    API = Shodan(SHODAN_API)
 
     config = Config({
         Option(
-            'HASH',
-            "Provide hash",
+            'IP',
+            "Provide your target IP",
             True,
-        ): str("f670080b1f42d1b70a37adda924976e6d7bd62bf77c35263aff97e7968291807"),
+        ): str("136.158.41.95"),
     })    
 
     def run(self):
-        hash = self.config.option('HASH').value
-        response = self.bazaar.query_hash(hash)
+        ip = self.config.option('IP').value
+        print("\n"" Analyzing '%s'..." % (ip))
+        # Lookup an IP
+        ipinfo = self.API.host(ip)
         raw_json = json.dumps(
-            response,
+            ipinfo,
             sort_keys=True,
             indent=4,
             separators=(',', ': ')
