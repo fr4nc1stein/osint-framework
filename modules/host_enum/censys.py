@@ -1,6 +1,5 @@
 from sploitkit import *
 from dotenv import load_dotenv
-import requests
 import os
 from terminaltables import SingleTable
 from censys.search import CensysHosts
@@ -8,11 +7,11 @@ import json
 import socket
 
 class censys(Module):
+    load_dotenv()
     """ This module load Censys
     Author:  laet4x
     Version: 1.0
     """
-    load_dotenv()
     config = Config({
         Option(
             'HOST',

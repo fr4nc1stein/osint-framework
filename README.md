@@ -43,10 +43,13 @@ pip3 install -r requirements.txt
 Create .env
 1. Virustotal API
 2. CENSYS API
+3. BLOCHAIN https://blockchainapi.com/#pricing
 ```
 VT_API=""
 CENSYS_APPID=""
 CENSYS_SECRET=""
+BLOCKCHAIN_API_KEY_ID = ""
+BLOCKCHAIN_API_SECRET_KEY = ""
 ```
 
 
