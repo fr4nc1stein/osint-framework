@@ -2,7 +2,6 @@ from sploitkit import Module, Config, Option, Command
 import requests
 from terminaltables import SingleTable
 from Wappalyzer import Wappalyzer, WebPage
-from terminaltables import SingleTable
 
 class wappalyzer(Module):
     # Command.set_style("module")
@@ -22,7 +21,7 @@ class wappalyzer(Module):
         TABLE_DATA = []
         wappalyzer = Wappalyzer.latest()
         url = self.config.option('URL').value
-        print("\n"" Analyzing '%s'..." % (url))
+        print("\n""Analyzing '%s'..." % (url))
         webpage = WebPage.new_from_url(url)
         results = wappalyzer.analyze(webpage)
         infos = ("URL", url)

@@ -30,7 +30,7 @@ class virusTotalUrlScan(Module):
             client = vt.Client(VT_API)
             url_id = vt.url_id(url)
             url_vt = client.get_object("/urls/{}", url_id)
-            print("\n"" Analyzing '%s'..." % (url))
+            print("\n""Analyzing '%s'..." % (url))
             
             infos = ("URL", url)
             TABLE_DATA.append(infos)

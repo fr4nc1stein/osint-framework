@@ -24,7 +24,7 @@ class shodanSearch(Module):
 
     def run(self):
         ip = self.config.option('IP').value
-        print("\n"" Analyzing '%s'..." % (ip))
+        print("\n""Analyzing '%s'..." % (ip))
         # Lookup an IP
         ipinfo = self.API.host(ip)
         raw_json = json.dumps(
