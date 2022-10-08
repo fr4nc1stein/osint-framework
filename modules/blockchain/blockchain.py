@@ -84,6 +84,6 @@ class ethereumNameIdentifier(Module):
         address = self.config.option('ADDRESS').value
         name = self.BLOCKCHAIN_API_RESOURCE.get_name_from_blockchain_identifier(address)
         print(f"The ENS of `{address}` is {name}.")
-     
+
 
 
