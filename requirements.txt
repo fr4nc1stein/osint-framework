@@ -7,3 +7,4 @@ dnspython
 win_unicode_console
 censys
 theblockchainapi
+malwarebazaar

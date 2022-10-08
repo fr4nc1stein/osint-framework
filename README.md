@@ -44,12 +44,14 @@ Create .env
 1. Virustotal API
 2. CENSYS API
 3. BLOCHAIN https://blockchainapi.com/#pricing
+4. ABUSECH https://bazaar.abuse.ch/ (not required)
 ```
 VT_API=""
 CENSYS_APPID=""
 CENSYS_SECRET=""
 BLOCKCHAIN_API_KEY_ID = ""
 BLOCKCHAIN_API_SECRET_KEY = ""
+ABUSECH_API_KEY = ""
 ```
 
 
