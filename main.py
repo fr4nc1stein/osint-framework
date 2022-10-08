@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import re
+import sys 
 from sploitkit import *
 from tinyscript.helpers import is_bool, ExpiringDict, Path
 from tinyscript import *
@@ -17,6 +18,9 @@ Osif launcher script.
 if __name__ == '__main__':
     parser.add_argument("-d", "--dev", action="store_true", help="enable development mode")
     initialize(exit_at_interrupt=False)
+    
+    #add traceback   
+    sys.tracebacklimit=0
     c = OsifConsole(
         "OSIF",
         #TODO: configure your console settings

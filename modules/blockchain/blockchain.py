@@ -20,13 +20,7 @@ class ethereumWalletBalance(Module):
         api_secret_key=BLOCKCHAIN_API_SECRET_KEY,
         blockchain=BLOCKCHAIN,
         network=NETWORK
-    )        
-
-    try:
-        assert BLOCKCHAIN_API_KEY_ID is not None
-        assert BLOCKCHAIN_API_SECRET_KEY is not None
-    except AssertionError:
-        raise Exception("Fill in your key ID pair!")  
+    )     
 
     config = Config({
         Option(
@@ -36,7 +30,11 @@ class ethereumWalletBalance(Module):
         ): str("0xbFCC250e1d5603d144c7ce99834403B0452d2644"),
     })
 
-
+    def prerun(self):
+        if(self.BLOCKCHAIN_API_KEY_ID == "" and self.BLOCKCHAIN_API_SECRET_KEY == ""):
+            print("Error: .env BLOCKCHAIN_API_KEY_ID and BLOCKCHAIN_API_SECRET_KEY are empty")
+            raise Exception("Fill in your key ID pair!")
+     
     def run(self):
         address = self.config.option('ADDRESS').value
         result = self.BLOCKCHAIN_API_RESOURCE.get_balance(address, unit=self.UNIT)
