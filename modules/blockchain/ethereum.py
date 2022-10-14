@@ -4,7 +4,7 @@ import os
 from theblockchainapi import BlockchainAPIResource, Blockchain, BlockchainNetwork, Wallet
 from terminaltables import SingleTable
 
-class ethereumWalletBalance(Module):
+class ethereumBalance(Module):
     """ This module find Wallet Balance
     Author:  laet4x
     Version: 1.0

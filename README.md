@@ -20,12 +20,13 @@ You can download Docker Compose binaries from the
 ### Run osif with docker and docker-compose
 1. docker-compose up -d
 2. docker exec -ti osif bash
-3. python3 -B main.py
+3. ./osif
 
 If not started, follow this instruction below:
 ```
 docker build --no-cache  --tag osif .
 docker run -ti osif bash
+./osif
 ```
 
 
@@ -46,6 +47,8 @@ Create .env
 3. BLOCHAIN https://blockchainapi.com/#pricing
 4. ABUSECH https://bazaar.abuse.ch/ (not required)
 5. SHODAN API https://account.shodan.io/
+6. FULLHUNT API (not working)
+7. HUNTER API https://hunter.io/api-keys
 ```
 VT_API=""
 CENSYS_APPID=""
@@ -53,6 +56,9 @@ CENSYS_SECRET=""
 BLOCKCHAIN_API_KEY_ID = ""
 BLOCKCHAIN_API_SECRET_KEY = ""
 ABUSECH_API_KEY = ""
+SHODAN_API_KEY = ""
+FULLHUNT_API_KEY = ""
+HUNTER_API_KEY = ""
 ```
 
 

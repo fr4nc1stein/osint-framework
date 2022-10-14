@@ -20,4 +20,6 @@ RUN pip3 install --user --upgrade git+https://github.com/twintproject/twint.git@
 
 COPY . .
 
-CMD [ "python3", "-B" , "main.py"]
+RUN chmod +x osif
+# CMD [ "python3", "-B" , "main.py"]
+CMD [ "./osif"]
