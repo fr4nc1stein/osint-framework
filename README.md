@@ -1,5 +1,14 @@
 # OSIF 
-This CLI framework is based on sploitkit and is an attempt to gather OSINT Tools. For the ease of use, the interface has a layout that looks like Metasploit.
+Opensource Intelligence Framework is an open-source framework dedicated to OSINT. For the ease of use, the interface has a layout that looks like Metasploit.
+
+It consists of various modules that aid osint operations:
+1. Attack Surface
+2. Blokchain
+3. Email
+4. Host Enumeration
+5. IoC
+6. Social Media
+7. Web Enumeration
 
 # Docker Installation (Recommended)
 
