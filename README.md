@@ -73,7 +73,7 @@ HUNTER_API_KEY = ""
 
 
 ```
-─$ python3 -B main.py 
+─$ ./osif
 
 
                                                          ##     ####   #####   ######
