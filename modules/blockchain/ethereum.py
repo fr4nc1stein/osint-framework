@@ -1,27 +1,17 @@
+from unittest import result
 from sploitkit import Module, Config, Option, Command
 from dotenv import load_dotenv
 import os
-from theblockchainapi import BlockchainAPIResource, Blockchain, BlockchainNetwork, Wallet
 from terminaltables import SingleTable
+import json
+import requests
+from pygments import highlight, lexers, formatters
 
 class ethereumBalance(Module):
-    """ This module find Wallet Balance
+    """ This module find Wallet Balance with other tokens
     Author:  laet4x
     Version: 1.0
     """
-
-    load_dotenv()
-    BLOCKCHAIN = Blockchain.ETHEREUM
-    NETWORK = BlockchainNetwork.EthereumNetwork.MAINNET
-    UNIT = 'ether'    
-    BLOCKCHAIN_API_KEY_ID = os.getenv('BLOCKCHAIN_API_KEY_ID')
-    BLOCKCHAIN_API_SECRET_KEY = os.getenv('BLOCKCHAIN_API_SECRET_KEY')
-    BLOCKCHAIN_API_RESOURCE = BlockchainAPIResource(
-        api_key_id=BLOCKCHAIN_API_KEY_ID,
-        api_secret_key=BLOCKCHAIN_API_SECRET_KEY,
-        blockchain=BLOCKCHAIN,
-        network=NETWORK
-    )     
 
     config = Config({
         Option(
@@ -31,26 +21,37 @@ class ethereumBalance(Module):
         ): str("0xbFCC250e1d5603d144c7ce99834403B0452d2644"),
     })
 
-    def prerun(self):
-        if(self.BLOCKCHAIN_API_KEY_ID == "" or self.BLOCKCHAIN_API_SECRET_KEY == ""):
-            print("Error: .env BLOCKCHAIN_API_KEY_ID or BLOCKCHAIN_API_SECRET_KEY are empty")
-            raise Exception("Fill in your key ID pair!")
      
     def run(self):
         TABLE_DATA = []
+        TABLE_DATAS = []
         address = self.config.option('ADDRESS').value
-        result = self.BLOCKCHAIN_API_RESOURCE.get_balance(address, unit=self.UNIT)
-        infos = ("ADDRESS", address)
+        url = "https://api.ethplorer.io/getAddressInfo/"+ address + "?apiKey=freekey"
+        response=requests.get(url)
+        r = json.loads(response.content)
+        infos = ("ADDRESS", r['address'])
         TABLE_DATA.append(infos)
+
+        infos = ("BALANCE", r['ETH']['balance'])
+        TABLE_DATA.append(infos)
+
+        infos = ("COUNT TXS", r['countTxs'])
+        TABLE_DATA.append(infos)
+
+        result = r['tokens']
+        infos = ("TOKEN", "BALANCE", "TOTAL IN", "TOTAL OUT")
+        TABLE_DATAS.append(infos)
         count = 1
         for key in result:
-            infos = (key, result[key])
-            TABLE_DATA.append(infos)
+            infos = (key['tokenInfo']['symbol'], key['balance'], key['totalIn'], key['totalOut'])
+            TABLE_DATAS.append(infos)
             count +=1
-        table = SingleTable(TABLE_DATA, "BALANCE")
+
+        table = SingleTable(TABLE_DATA, "ETH")
         print("\n"+table.table)    
-        # print(f"Balance of {address}")
-        # print(result)
+
+        table = SingleTable(TABLE_DATAS, "TOKEN")
+        print("\n"+table.table)   
 
 class ethereumNameIdentifier(Module):
     """ This module find ENS of Address
@@ -65,36 +66,32 @@ class ethereumNameIdentifier(Module):
     eosif blockchain(ethereum_name_identifier) >  
     """
 
-    load_dotenv()
-    BLOCKCHAIN = Blockchain.ETHEREUM
-    NETWORK = BlockchainNetwork.EthereumNetwork.MAINNET
-    UNIT = 'ether'    
-    BLOCKCHAIN_API_KEY_ID = os.getenv('BLOCKCHAIN_API_KEY_ID')
-    BLOCKCHAIN_API_SECRET_KEY = os.getenv('BLOCKCHAIN_API_SECRET_KEY')
-    BLOCKCHAIN_API_RESOURCE = BlockchainAPIResource(
-        api_key_id=BLOCKCHAIN_API_KEY_ID,
-        api_secret_key=BLOCKCHAIN_API_SECRET_KEY,
-        blockchain=BLOCKCHAIN,
-        network=NETWORK
-    )     
-
     config = Config({
         Option(
             'ADDRESS',
-            "Provide your target address",
+            "Provide your target address or ENS",
             True,
         ): str("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"),
     })
 
-    def prerun(self):
-        if(self.BLOCKCHAIN_API_KEY_ID == "" or self.BLOCKCHAIN_API_SECRET_KEY == ""):
-            print("Error: .env BLOCKCHAIN_API_KEY_ID or BLOCKCHAIN_API_SECRET_KEY are empty")
-            raise Exception("Fill in your key ID pair!")
-     
     def run(self):
+        TABLE_DATA = []
         address = self.config.option('ADDRESS').value
-        name = self.BLOCKCHAIN_API_RESOURCE.get_name_from_blockchain_identifier(address)
-        print(f"The ENS of `{address}` is {name}.")
+        url = "https://api.ensideas.com/ens/resolve/"+ address
+        response=requests.get(url)
+        r = json.loads(response.content)
+
+        infos = ("ADDRESS", r['address'])
+        TABLE_DATA.append(infos)
+
+        infos = ("NAME", r['name'])
+        TABLE_DATA.append(infos)
+
+        infos = ("AVATAR", r['avatar'])
+        TABLE_DATA.append(infos)
+
+        table = SingleTable(TABLE_DATA, "ETH")
+        print("\n"+table.table)   
 
 
 
