@@ -3,7 +3,7 @@ Opensource Intelligence Framework is an open-source framework dedicated to OSINT
 
 It consists of various modules that aid osint operations:
 1. Attack Surface
-2. Blokchain
+2. Blockchain
 3. Email
 4. Host Enumeration
 5. IoC
@@ -73,7 +73,7 @@ HUNTER_API_KEY = ""
 
 
 ```
-─$ python3 -B main.py 
+─$ ./osif
 
 
                                                          ##     ####   #####   ######
