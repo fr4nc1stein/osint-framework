@@ -10,6 +10,9 @@ It consists of various modules that aid osint operations:
 6. Social Media
 7. Web Enumeration
 
+# Documentation
+Full documentation found at https://osif.laet4x.com/
+
 # Docker Installation (Recommended)
 
 ### Docker installation
