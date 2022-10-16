@@ -1,6 +1,5 @@
 from sploitkit import *
 import requests
-from terminaltables import SingleTable
 
 class dnsRecords(Module):
     """ This module find DNS information
@@ -12,7 +11,7 @@ class dnsRecords(Module):
             'DOMAIN',
             "Provide your target Domain",
             True,
-        ): str("google.com"),
+        ): str("laet4x.com"),
     })
 
     def run(self):
