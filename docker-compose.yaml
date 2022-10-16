@@ -7,6 +7,6 @@ services:
       dockerfile: Dockerfile
     container_name: osif
     tty: true
-    command: python3 -B main.py
+    command: ./osif
     volumes:
      - .:/osif
