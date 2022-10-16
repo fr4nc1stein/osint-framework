@@ -3,7 +3,9 @@ import jellyfish
 from sploitkit import Module, Config, Option, Command
 
 class SearchMobile(Module):
-    """ This module with validate if the mobile number is temporary.
+    """ This module validates if the mobile number used for receiving SMS is a temporary number. 
+    This numbers are often used for temporary registration in sites but is not act 
+    as legit mobile number.
     Author:  cadeath
     Version: 1.0
     """
