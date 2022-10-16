@@ -1,4 +1,5 @@
-import requests
+import os
+import jellyfish
 from sploitkit import Module, Config, Option, Command
 
 class SearchMobile(Module):
@@ -11,13 +12,15 @@ class SearchMobile(Module):
             'Mobile',
             "Enter your 11 digit mobile number",
             True,
-        ): str("+639xxxxxxxxx"),
+        ): str("+63xxxxxxxxx"),
         Option(
             'Update_DB',
             "Force to update the database",
             False,
         ): bool("False"),
     })
+
+    list_number = "/db/mobile.txt"
     
     def _fetch(self):
         print("Fetching DB...")
@@ -25,5 +28,16 @@ class SearchMobile(Module):
     def run(self):
         if self.config.option("Update_DB").value:
             self._fetch()
+
+        DB_TMP = os.getcwd() + self.list_number        
         
-        print("Not Found")
+        search_number = str(self.config.option("Mobile").value)
+        numbers = open(DB_TMP)
+        for num in numbers:
+            res = jellyfish.jaro_distance(num, search_number)            
+            if res > 0.86:
+                print(f"{search_number} is a temporary number!")                
+                return
+
+        print(f"{search_number} seems legit to me.")
+                
