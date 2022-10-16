@@ -112,4 +112,5 @@ osif dns(dns_records) >
 
 
 # Author
-Al Francis 
+laet4x
+cadeath

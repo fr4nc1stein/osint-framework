@@ -1,6 +1,5 @@
 from sploitkit import Module, Config, Option, Command
 import requests
-from terminaltables import SingleTable
 
 class dnsHost(Module):
     # Command.set_style("module")
