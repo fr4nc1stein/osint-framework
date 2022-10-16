@@ -3,7 +3,7 @@ from sploitkit import *
 import sublist3r
 
 class sublister(Module):
-    """ This module find WHOIS Information
+    """ This module find a sub-domain using sublister module
     Author:  laet4x
     Version: 1.0
     """

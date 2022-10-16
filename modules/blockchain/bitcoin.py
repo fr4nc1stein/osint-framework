@@ -3,7 +3,6 @@ import json
 from requests_oauthlib import OAuth1
 from sploitkit import Module, Config, Option, Command
 from dotenv import load_dotenv
-import os
 from terminaltables import SingleTable
 
 

@@ -1,5 +1,4 @@
 from sploitkit import Module, Config, Option, Command
-import requests
 from terminaltables import SingleTable
 from Wappalyzer import Wappalyzer, WebPage
 

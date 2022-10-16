@@ -1,6 +1,4 @@
 from sploitkit import *
-import requests
-import json
 from terminaltables import SingleTable
 import twint
 from datetime import datetime

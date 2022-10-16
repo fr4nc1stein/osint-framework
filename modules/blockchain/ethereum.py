@@ -1,7 +1,6 @@
 from unittest import result
 from sploitkit import Module, Config, Option, Command
 from dotenv import load_dotenv
-import os
 from terminaltables import SingleTable
 import json
 import requests
