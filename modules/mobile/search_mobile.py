@@ -11,12 +11,12 @@ class SearchMobile(Module):
     """
     config = Config({
         Option(
-            'Mobile',
+            'mobile',
             "Enter your 11 digit mobile number",
             True,
         ): str("+63xxxxxxxxx"),
         Option(
-            'Update_DB',
+            'db_update',
             "Force to update the database",
             False,
         ): bool("False"),
@@ -25,7 +25,8 @@ class SearchMobile(Module):
     list_number = "/db/mobile.txt"
     
     def _fetch(self):
-        print("Fetching DB...")
+        # print("Fetching DB...")
+        pass
     
     def run(self):
         if self.config.option("Update_DB").value:
@@ -36,10 +37,14 @@ class SearchMobile(Module):
         search_number = str(self.config.option("Mobile").value)
         numbers = open(DB_TMP)
         for num in numbers:
+            # Skip comment line
+            if "#" in num:
+                continue
+
             res = jellyfish.jaro_distance(num, search_number)            
             if res > 0.86:
-                print(f"{search_number} is a temporary number!")                
+                print(f"!!! {search_number} is a temporary number!!!")
                 return
 
-        print(f"{search_number} seems legit to me.")
+        print(f"{search_number} seems legit to me...")
                 
