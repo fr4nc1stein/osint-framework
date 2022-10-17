@@ -7,7 +7,7 @@ class SearchTempMobile(Module):
     This numbers are often used for temporary registration in sites but is not act 
     as legit mobile number.
     Author:  cadeath
-    Version: 1.0.1
+    Version: 1.0.2
     """
     config = Config({
         Option(
@@ -40,6 +40,9 @@ class SearchTempMobile(Module):
         for num in numbers:
             # Skip comment line
             if "#" in num:
+                continue
+            # Skip newline
+            if num == "":
                 continue
 
             res = jellyfish.jaro_distance(num, search_number)            
