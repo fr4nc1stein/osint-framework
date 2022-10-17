@@ -1,0 +1,15 @@
+opencv-python
+setuptools>=42
+sploitkit>=0.5.5
+terminaltables
+vt-py
+python-dotenv
+sublist3r
+dnspython
+win_unicode_console
+censys
+malwarebazaar
+python-Wappalyzer
+shodan
+requests_oauthlib
+jellyfish

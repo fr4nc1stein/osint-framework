@@ -15,7 +15,7 @@ __doc__    = """
 Osif launcher script.
 """
 
-if __name__ == '__main__':
+def main():
     parser.add_argument("-d", "--dev", action="store_true", help="enable development mode")
     initialize(exit_at_interrupt=False)
     
@@ -33,3 +33,5 @@ if __name__ == '__main__':
         debug=args.verbose,
     )
     c.start()
+    
+# if __name__ == "__main__": main()    

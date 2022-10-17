@@ -1,0 +1,2 @@
+[console_scripts]
+osif = osif.__main__:main
