@@ -11,12 +11,12 @@ class SearchMobile(Module):
     """
     config = Config({
         Option(
-            'mobile',
+            'MOBILE',
             "Enter your 11 digit mobile number",
             True,
         ): str("+63xxxxxxxxx"),
         Option(
-            'db_update',
+            'DB_UPDATE',
             "Force to update the database",
             False,
         ): bool("False"),
@@ -29,12 +29,12 @@ class SearchMobile(Module):
         pass
     
     def run(self):
-        if self.config.option("Update_DB").value:
+        if self.config.option("DB_UPDATE").value:
             self._fetch()
 
         DB_TMP = os.getcwd() + self.list_number        
         
-        search_number = str(self.config.option("Mobile").value)
+        search_number = str(self.config.option("MOBILE").value)
         numbers = open(DB_TMP)
         for num in numbers:
             # Skip comment line
