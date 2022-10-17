@@ -59,6 +59,7 @@ Create .env
 3. ABUSECH https://bazaar.abuse.ch/ (not required)
 4. SHODAN API https://account.shodan.io/
 5. HUNTER API https://hunter.io/api-keys
+6. BITCOIN ABUSE API https://www.bitcoinabuse.com/
 ```
 VT_API=""
 CENSYS_APPID=""
@@ -66,6 +67,7 @@ CENSYS_SECRET=""
 ABUSECH_API_KEY = ""
 SHODAN_API_KEY = ""
 HUNTER_API_KEY = ""
+BITCOINABUSE_API_KEY = ""
 ```
 
 
@@ -112,5 +114,4 @@ osif dns(dns_records) >
 
 # Author
 laet4x
-
 cadeath

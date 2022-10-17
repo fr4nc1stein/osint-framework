@@ -10,3 +10,4 @@ malwarebazaar
 python-Wappalyzer
 shodan
 requests_oauthlib
+jellyfish
