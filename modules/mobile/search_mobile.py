@@ -7,19 +7,20 @@ class SearchTempMobile(Module):
     This numbers are often used for temporary registration in sites but is not act 
     as legit mobile number.
     Author:  cadeath
-    Version: 1.0
+    Version: 1.0.1
     """
     config = Config({
         Option(
-            'MOBILE',
+            "MOBILE",
             "Enter your 11 digit mobile number",
             True,
         ): str("+63xxxxxxxxx"),
         Option(
-            'DB_UPDATE',
-            "Force to update the database",
-            False,
-        ): bool("False"),
+            "DB_UPDATE",
+            "Force to update the database (not yet working)",
+            True,
+            bool,
+        ): "False",
     })
 
     list_number = "/db/mobile.txt"
