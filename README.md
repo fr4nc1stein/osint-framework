@@ -3,12 +3,13 @@ Opensource Intelligence Framework is an open-source framework dedicated to OSINT
 
 It consists of various modules that aid osint operations:
 1. Attack Surface
-2. Blockchain
-3. Email
-4. Host Enumeration
-5. IoC
-6. Social Media
-7. Web Enumeration
+1. Blockchain
+1. Email
+1. Host Enumeration
+1. IoC
+1. Mobile
+1. Social Media
+1. Web Enumeration
 
 # Documentation
 Full documentation found at https://osif.laet4x.com/
@@ -114,5 +115,4 @@ osif dns(dns_records) >
 
 # Author
 laet4x
-
 cadeath
