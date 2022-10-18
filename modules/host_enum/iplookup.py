@@ -10,7 +10,7 @@ class iplookup(Module):
     """
     config = Config({
         Option(
-            'IP',
+            'HOST_IP',
             "Provide your target IP",
             True,
         ): str("136.158.41.95"),
@@ -18,7 +18,7 @@ class iplookup(Module):
 
     def run(self):
         dataList = []
-        ip = self.config.option('IP').value
+        ip = self.config.option('HOST_IP').value
 
         print("\n"" Locating '%s'..." % (ip))
 
