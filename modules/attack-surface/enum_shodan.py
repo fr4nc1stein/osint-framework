@@ -16,17 +16,17 @@ class shodanSearch(Module):
 
     config = Config({
         Option(
-            'IP',
+            'HOST_IP',
             "Provide your target IP",
             True,
         ): str("136.158.41.95"),
     })    
 
     def run(self):
-        ip = self.config.option('IP').value
-        print("\n""Analyzing '%s'..." % (ip))
+        host = self.config.option('HOST_IP').value
+        print("\n""Analyzing '%s'..." % (host))
         # Lookup an IP
-        ipinfo = self.API.host(ip)
+        ipinfo = self.API.host(host)
         raw_json = json.dumps(
             ipinfo,
             sort_keys=True,
