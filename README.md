@@ -31,9 +31,13 @@ You can download Docker Compose binaries from the
 [release page](https://github.com/docker/compose/releases) on this repository.
 
 ### Run osif with docker and docker-compose
-1. docker-compose up -d
-2. docker exec -ti osif bash
-3. ./osif
+```
+git clone https://github.com/fr4nc1stein/osint-framework osif
+cd osif
+docker-compose up -d
+docker exec -ti osif bash
+./osif
+```
 
 If not started, follow this instruction below:
 ```
