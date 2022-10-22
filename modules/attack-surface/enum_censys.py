@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 import json
 import socket
+from pygments import highlight, lexers, formatters
 
 class censys(Module):
     """ This module load Censys
@@ -41,11 +42,16 @@ class censys(Module):
         print("\n"" Analyzing '%s'..." % (host))
         h = CensysHosts(censys_appid,censys_secret)
         x = h.view(host)
-        print(json.dumps(
+        raw_json = json.dumps(
             x,
             sort_keys=True,
             indent=4,
             separators=(',', ': ')
-        ))
-        
+        )
+        colorful = highlight(
+            raw_json,
+            lexer=lexers.JsonLexer(),
+            formatter=formatters.TerminalFormatter(),
+        )
+        print(colorful)
 
