@@ -40,9 +40,17 @@ class shodanSearch(Module):
         TABLE_DATA.append(infos)
         
         #domain
-        domains =  ipinfo['domains']
-        newStringDomains = ','.join(str(x) for x in domains)
-        infos = ("DOMAINS", newStringDomains)
+        hostnames =  ipinfo['hostnames']
+        newStringHostnames = ','.join(str(x) for x in hostnames)
+        infos = ("HOSTNAME", newStringHostnames)
+        TABLE_DATA.append(infos)
+
+        #ORG
+        infos = ("ORG", ipinfo['org'])
+        TABLE_DATA.append(infos)
+
+         #ISP
+        infos = ("ISP", ipinfo['isp'])
         TABLE_DATA.append(infos)
 
         #ports
@@ -50,6 +58,12 @@ class shodanSearch(Module):
         newStringPorts = ','.join(str(x) for x in ports)
         infos = ("PORTS", newStringPorts)
         TABLE_DATA.append(infos)
+
+        if "vulns" in ipinfo:
+            vulns =  ipinfo['vulns'][0:5]
+            newStringVulns = ','.join(str(x) for x in vulns)
+            infos = ("VULNERABILITIES", newStringVulns + " and more...")
+            TABLE_DATA.append(infos)
 
         #modules/service
         modules = []
