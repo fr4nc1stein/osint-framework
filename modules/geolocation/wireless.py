@@ -34,7 +34,7 @@ class GeoWireless(Module):
         "Lon1":"115.8137",
         "Lon2":"126.9333"
     }
-
+    
     def run(self):
         API_NAME = os.getenv('WIGLE_API_NAME')
         API_KEY = os.getenv('WIGLE_API_TOKEN')
@@ -56,10 +56,6 @@ class GeoWireless(Module):
         title = f"{entryType}: {wirelessIdentifier}"
         th = ('Seen','Location','Coordinates')
         tableData.append(th)
-
-        if rep["resultCount"] == 0:
-            print("No entries found.")
-            return
 
         for el in rep["results"]:
             tableData.append((el["lastupdt"],f"{el['road']} {el['city']} {el['region']}",f"{el['trilat']} , {el['trilong']}"))
@@ -107,3 +103,6 @@ class GeoWireless(Module):
             url += f"&ssid={id}"
 
         return url, entryType
+
+    def _requestBT(self,id):
+        pass
