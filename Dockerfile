@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install git build-essential -y
 RUN apt-get install libmagic1 -y
 
 COPY requirements.txt requirements.txt
-COPY .env .env
+COPY .env.example .env
 RUN pip3 install -r requirements.txt
 RUN pip3 install --user --upgrade git+https://github.com/twintproject/twint.git@origin/master#egg=twint
 
