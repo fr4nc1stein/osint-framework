@@ -1,4 +1,3 @@
-from email import header
 import os, re
 import requests, json
 from datetime import date
