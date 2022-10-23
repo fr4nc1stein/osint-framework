@@ -1,6 +1,4 @@
-import os
-import json
-import requests
+import os, re, json, requests
 from base64 import b64encode
 from terminaltables import SingleTable
 from sploitkit import Module, Config, Option
@@ -30,6 +28,10 @@ class GeoBluetooth(Module):
         authHeaders = { 'Authorization': 'Basic ' + BasicAuth, 'Accept': 'application/json'}
 
         blueTooth = self.config.option('BLUETOOTH_BSSID').value
+
+        if not self._formatCheck(blueTooth):
+            print ("Invalid format.")
+            return
 
         print ("Searching...")
 
@@ -92,3 +94,9 @@ class GeoBluetooth(Module):
             formatter=formatters.TerminalFormatter(),
         )
         print(colorful)
+
+    def _formatCheck(self,entry):
+        if re.match("[0-9a-f]{2}([-:]?)[0-9a-f]{2}(\\1[0-9a-f]{2}){4}$", entry.lower()):
+            return True
+
+        return False
