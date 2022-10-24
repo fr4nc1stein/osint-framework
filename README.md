@@ -65,7 +65,7 @@ Create .env
 4. SHODAN API https://account.shodan.io/
 5. HUNTER API https://hunter.io/api-keys
 6. BITCOIN ABUSE API https://www.bitcoinabuse.com/
-7. WIGEL API https://wigle.net/
+7. WIGEL API https://wigle.net/ (geolocation module)
 ```
 VT_API=""
 CENSYS_APPID=""
