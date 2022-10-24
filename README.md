@@ -65,6 +65,7 @@ Create .env
 4. SHODAN API https://account.shodan.io/
 5. HUNTER API https://hunter.io/api-keys
 6. BITCOIN ABUSE API https://www.bitcoinabuse.com/
+7. WIGEL API https://wigle.net/
 ```
 VT_API=""
 CENSYS_APPID=""
@@ -73,6 +74,8 @@ ABUSECH_API_KEY = ""
 SHODAN_API_KEY = ""
 HUNTER_API_KEY = ""
 BITCOINABUSE_API_KEY = ""
+WIGLE_API_NAME = ""
+WIGLE_API_TOKEN = ""
 ```
 
 
