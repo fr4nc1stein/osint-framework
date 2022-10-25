@@ -1,4 +1,7 @@
 # OSIF 
+[![Read The Docs](https://osif.laet4x.com/)](https://osif.laet4x.com/)
+[![License](https://img.shields.io/badge/license-AGPL%20v3-lightgrey.svg)](https://github.com/fr4nc1stein/osint-framework/blob/main/LICENSE.md)
+
 Opensource Intelligence Framework is an open-source framework dedicated to OSINT. For the ease of use, the interface has a layout that looks like Metasploit.
 
 It consists of various modules that aid osint operations:
