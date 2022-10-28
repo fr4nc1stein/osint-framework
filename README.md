@@ -52,7 +52,7 @@ docker run -ti osif bash
 
 
 # Installation
-Recommended on linux or kali
+Recommended on ubuntu or kali
 ```
 git clone https://github.com/fr4nc1stein/osint-framework osif
 cd osif
