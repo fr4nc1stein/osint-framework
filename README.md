@@ -16,9 +16,9 @@ It consists of various modules that aid osint operations:
 
 ## Screenshots
 
-![Email Hunter](screenshots/email_hunter.jpg "Hunting Domain Email")
-![GeoWifi Hunter](screenshots/geo_wifi.jpg "Hunting Gelocation of WIFI SSID")
-![Shodan](screenshots/shodan.jpg "Attack Surface")
+![Email Hunter](screenshots/email_hunter.png "Hunting Domain Email")
+![GeoWifi Hunter](screenshots/geo_wifi.png "Hunting Gelocation of WIFI SSID")
+![Shodan](screenshots/shodan.png "Attack Surface")
 
 # Documentation
 Full documentation found at https://osif.laet4x.com/
