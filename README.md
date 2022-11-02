@@ -14,6 +14,12 @@ It consists of various modules that aid osint operations:
 1. Social Media
 1. Web Enumeration
 
+## Screenshots
+
+![Email Hunter](screenshots/email_hunter.jpg "Hunting Domain Email")
+![GeoWifi Hunter](screenshots/geo_wifi.jpg "Hunting Gelocation of WIFI SSID")
+![Shodan](screenshots/shodan.jpg "Attack Surface")
+
 # Documentation
 Full documentation found at https://osif.laet4x.com/
 
