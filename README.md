@@ -23,7 +23,7 @@ It consists of various modules that aid osint operations:
 ![GeoWifi Hunter](screenshots/geo_wifi.png "Hunting Gelocation of WIFI SSID")
 
 ### Shodan Attack Surface
-![Shodan](screenshots/shodan.png "Attack Surface")
+![Shodan](screenshots/attack_surface_shodan.png "Attack Surface")
 
 # Documentation
 Full documentation found at https://osif.laet4x.com/
