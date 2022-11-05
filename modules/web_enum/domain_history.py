@@ -1,6 +1,6 @@
 import os,json,requests
 
-from sploitkit import Module, Config, Option, Command
+from sploitkit import Module, Config, Option
 from terminaltables import SingleTable
 
 class DomainHistory(Module):
