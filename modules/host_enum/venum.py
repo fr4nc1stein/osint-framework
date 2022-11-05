@@ -1,4 +1,4 @@
-import requests
+import os,requests
 from sploitkit import Module, Config, Option, Model
 
 class Venum(Module):
@@ -31,5 +31,17 @@ class Venum(Module):
     })
     
     def run(self):
-        pass
-    
+        UA = self.config.option('USERAGENT').value
+        targetIP = self.config.option('IP').value
+        ipFile = self.config.option('IP_FILE').value
+
+        target = targetIP    
+        if targetIP == "xx.xx.xx.xx":
+            target = ipFile            
+            if not os.path.exists(ipFile):
+                print("Missing input")
+                return 
+
+        print("Searching...")
+        if targetIP[:7] == "file://":
+            pass
