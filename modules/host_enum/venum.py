@@ -1,5 +1,5 @@
 import requests
-from sploitkit import Module, Config, Option
+from sploitkit import Module, Config, Option, Model
 
 class Venum(Module):
     """ This module will check if the IP hosted a domain that is using a virtualhost
@@ -17,7 +17,12 @@ class Venum(Module):
             "IP",
             "Provide a IP for a specific target",
             False,
-        ): str("136.158.41.95"),
+        ): str("xx.xx.xx.xx"),
+        Option(
+            "IP_FILE",
+            "Provide file used to checked vhost",
+            False,
+        ): str("output/vhost_ips.txt"),
         Option(
             "USERAGENT",
             "Provide your desire User-Agent",
