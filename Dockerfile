@@ -7,11 +7,9 @@ LABEL desc="Docker for OSIF"
 WORKDIR /osif
 
 RUN apt-get update && \
-    apt-get -y install gcc mono-mcs && \
+    apt-get -y install build-essential git \
+        gcc mono-mcs libmagic1 && \
     rm -rf /var/lib/apt/lists/*
-
-RUN apt-get update && apt-get install git build-essential -y
-RUN apt-get install libmagic1 -y
 
 COPY requirements.txt requirements.txt
 COPY .env.example .env
