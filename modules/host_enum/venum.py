@@ -22,7 +22,7 @@ class Venum(Module):
             "IP_FILE",
             "Provide file used to checked vhost",
             False,
-        ): str("output/vhost_ips.txt"),
+        ): str("file://output/vhost_ips.txt"),
         Option(
             "USERAGENT",
             "Provide your desire User-Agent",
@@ -32,3 +32,4 @@ class Venum(Module):
     
     def run(self):
         pass
+    
