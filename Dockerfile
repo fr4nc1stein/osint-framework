@@ -1,17 +1,17 @@
-FROM python:3.8-slim-buster
+FROM python:3.10.8-slim-bullseye
 
-LABEL maintainer = "laet4x"
+LABEL maintainer = "laet4x|cadeath"
 LABEL website="laet4x.com"
 LABEL desc="Docker for OSIF"
 
 WORKDIR /osif
 
 RUN apt-get update && \
-    apt-get -y install gcc mono-mcs && \
+    apt-get upgrade -yq
+RUN apt-get -y install build-essential git \
+        gcc mono-mcs libmagic1 && \
     rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install git build-essential -y
-RUN apt-get install libmagic1 -y
 
 COPY requirements.txt requirements.txt
 COPY .env.example .env
@@ -21,5 +21,4 @@ RUN pip3 install --user --upgrade git+https://github.com/twintproject/twint.git@
 COPY . .
 
 RUN chmod +x osif
-# CMD [ "python3", "-B" , "main.py"]
 CMD [ "./osif"]
