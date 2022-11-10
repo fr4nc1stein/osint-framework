@@ -5,7 +5,7 @@ from datetime import datetime
 from sploitkit import Module, Config, Option
 from terminaltables import SingleTable
 
-DEBUG = True
+DEBUG = False
 
 class DomainHistory(Module):
     """ This module fetch passive data containing historical records on a target domain.
@@ -83,30 +83,40 @@ class DomainHistory(Module):
 
         if tobeExtracted:
             WAF_IPS = []
+            possibleIPS = []
+
             blockIPs = open("db/waf-ips.txt")
             for waf in blockIPs:
                 # Skip comment line
                 if "#" in waf:
                     continue
 
-                WAF_IPS.append(waf)
-            blockIPs.close()
+                if waf.strip() == "":
+                    continue
 
-            filename = self._extract_init("#ip",fname="ip-list")
-            f = open(filename,"a")
+                WAF_IPS.append(waf.strip())
+            blockIPs.close()
+                
+            filename = self._extract_init("#possible-ips",fname="ip-list")            
             for rec in d["records"]:
                 for rv in rec["values"]:
-                    for excludeIP in WAF_IPS:
-                        result = ipaddress.ip_address(rv['ip']) in ipaddress.ip_network(excludeIP.strip())
-                        if not result:
-                            f.writelines(rv['ip'] + "\n")
-
-            f.close()
-            print("Result at",filename)
-
-
+                    for IPrange in WAF_IPS:
+                        isBlock = ipaddress.ip_address(rv['ip']) in ipaddress.ip_network(IPrange)
+                        if not isBlock:                            
+                            if not rv['ip'] in possibleIPS:
+                                possibleIPS.append(rv['ip'])
             
-    
+            if DEBUG:
+                print("Extracted IPs")
+                print(possibleIPS)
+
+            f = open(filename,"a")
+            for ip in possibleIPS:
+                f.writelines(ip + "\n")
+            f.close()
+
+            print(f"Result at \"{filename}\"")
+            
     def _extract_init(self,headers,fname="file"):
         if not os.path.exists("outputs/"):
             os.makedirs("outputs/")
