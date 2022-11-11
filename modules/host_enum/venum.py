@@ -31,17 +31,26 @@ class Venum(Module):
     })
     
     def run(self):
+        VHOST = self.config.option('DOMAIN').value
         UA = self.config.option('USERAGENT').value
         targetIP = self.config.option('IP').value
         ipFile = self.config.option('IP_FILE').value
 
         target = targetIP    
-        if targetIP == "xx.xx.xx.xx":
-            target = ipFile            
+        if targetIP == "xx.xx.xx.xx" or targetIP == "":
+            target = ipFile
             if not os.path.exists(ipFile):
                 print("Missing input")
                 return 
 
-        print("Searching...")
         if targetIP[:7] == "file://":
             pass
+
+    def _venum(self,d,ip,ua):
+        ch = {
+            "User-Agent": ua,
+            "Host": d
+        }
+
+        
+        pass

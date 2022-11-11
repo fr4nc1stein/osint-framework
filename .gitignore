@@ -6,3 +6,5 @@ __pycache__/
 outputs/*
 tmp/
 .DS_Store
+.dccache
+module-error.log
