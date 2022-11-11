@@ -74,12 +74,13 @@ pip3 install -r requirements.txt
 
 Create .env
 1. Virustotal API https://www.virustotal.com/
-2. CENSYS API https://accounts.censys.io/ (under development)
-3. ABUSECH https://bazaar.abuse.ch/ (not required)
-4. SHODAN API https://account.shodan.io/
-5. HUNTER API https://hunter.io/api-keys
-6. BITCOIN ABUSE API https://www.bitcoinabuse.com/
-7. WIGEL API https://wigle.net/ (geolocation module)
+1. CENSYS API https://accounts.censys.io/ (under development)
+1. ABUSECH https://bazaar.abuse.ch/ (not required)
+1. SHODAN API https://account.shodan.io/
+1. HUNTER API https://hunter.io/api-keys
+1. BITCOIN ABUSE API https://www.bitcoinabuse.com/
+1. WIGEL API https://wigle.net/ (geolocation module)
+1. SECURITY TRAIL API https://securitytrails.com/
 ```
 VT_API=""
 CENSYS_APPID=""
@@ -90,6 +91,7 @@ HUNTER_API_KEY = ""
 BITCOINABUSE_API_KEY = ""
 WIGLE_API_NAME = ""
 WIGLE_API_TOKEN = ""
+SECURITY_TRAIL_API = ""
 ```
 
 
