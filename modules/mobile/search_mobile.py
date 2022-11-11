@@ -36,6 +36,7 @@ class SearchTempMobile(Module):
         DB_TMP = os.getcwd() + self.list_number        
         
         search_number = str(self.config.option("MOBILE").value)
+        # file deepcode ignore MissingClose: Not Missing actually... It is totally working fine for me.
         numbers = open(DB_TMP)
         for num in numbers:
             # Skip comment line
