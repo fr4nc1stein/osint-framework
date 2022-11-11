@@ -5,3 +5,4 @@ __pycache__/
 
 outputs/*
 tmp/
+.DS_Store
