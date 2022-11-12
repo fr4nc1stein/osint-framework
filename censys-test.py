@@ -48,14 +48,19 @@ def parseData(file):
         if d['code'] != 200:
             continue
 
-        print(f"running test on {len(d['result']['hits'])} data")
         for hit in d['result']['hits']:
             ip = hit['ip']
-            if not isWaf(ip):
-                foundIP.append(ip)
-
+            foundIP.append(ip)
+            
     f.close()
     print(len(foundIP))
+
+    possibleIP = []
+    for ip in foundIP:
+        if isWaf(ip):
+            continue
+        
+        possibleIP.append(ip)
 
 def isWaf(ip):
     url = "http://ip-api.com/json/"
