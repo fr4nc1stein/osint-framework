@@ -2,7 +2,6 @@ from sploitkit import *
 
 # needs more focus soon
 
-
 class CommandWithOneArg(Command):
     """ Description here """
     level = "module"

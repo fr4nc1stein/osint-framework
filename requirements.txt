@@ -11,3 +11,4 @@ python-Wappalyzer
 shodan
 requests_oauthlib
 jellyfish
+prettytable
