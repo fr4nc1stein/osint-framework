@@ -2,7 +2,7 @@
 [![Read The Docs](https://readthedocs.org/projects/osint-framework/badge/?version=latest)](https://osif.laet4x.com/)
 [![License](https://img.shields.io/badge/license-AGPL%20v3-lightgrey.svg)](https://github.com/fr4nc1stein/osint-framework/blob/main/LICENSE.md)
 
-Opensource Intelligence Framework is an open-source framework dedicated to OSINT. For the ease of use, the interface has a layout that looks like Metasploit.
+Opensource Intelligence Framework adalah kerangka kerja sumber terbuka yang didedikasikan untuk OSINT. Untuk kemudahan penggunaan, antarmukanya memiliki tata letak yang mirip dengan Metasploit.
 
 It consists of various modules that aid osint operations:
 1. Attack Surface
