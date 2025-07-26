@@ -1,4 +1,4 @@
-FROM python:3.10.8-slim-bullseye
+FROM python:3.14.0rc1-slim-bullseye
 
 LABEL maintainer = "laet4x|cadeath"
 LABEL website="laet4x.com"
