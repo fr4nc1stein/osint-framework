@@ -14,4 +14,4 @@ jellyfish
 prettytable
 cchardet==2.2.0a2 
 twint
-async_timeout
+async_timeout==3.0.1

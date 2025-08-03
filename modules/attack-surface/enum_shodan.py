@@ -14,6 +14,8 @@ class shodanSearch(Module):
     """
     load_dotenv()
     SHODAN_API = os.getenv('SHODAN_API_KEY')
+    if not SHODAN_API:
+        raise ValueError("SHODAN_API_KEY not found in environment. Please set it in your .env file.")
     API = Shodan(SHODAN_API)
 
     config = Config({
