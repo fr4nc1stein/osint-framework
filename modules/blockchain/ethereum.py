@@ -26,31 +26,37 @@ class ethereumBalance(Module):
         TABLE_DATAS = []
         address = self.config.option('ADDRESS').value
         url = "https://api.ethplorer.io/getAddressInfo/"+ address + "?apiKey=freekey"
-        response=requests.get(url)
+        response = requests.get(url)
         r = json.loads(response.content)
-        infos = ("ADDRESS", r['address'])
+
+        infos = ("ADDRESS", r.get('address', 'N/A'))
         TABLE_DATA.append(infos)
 
-        infos = ("BALANCE", r['ETH']['balance'])
+        eth_info = r.get('ETH', {})
+        infos = ("BALANCE", eth_info.get('balance', 'N/A'))
         TABLE_DATA.append(infos)
 
-        infos = ("COUNT TXS", r['countTxs'])
+        infos = ("COUNT TXS", r.get('countTxs', 'N/A'))
         TABLE_DATA.append(infos)
 
-        result = r['tokens']
+        tokens = r.get('tokens', [])
         infos = ("TOKEN", "BALANCE", "TOTAL IN", "TOTAL OUT")
         TABLE_DATAS.append(infos)
-        count = 1
-        for key in result:
-            infos = (key['tokenInfo']['symbol'], key['balance'], key['totalIn'], key['totalOut'])
+        for key in tokens:
+            token_info = key.get('tokenInfo', {})
+            infos = (
+                token_info.get('symbol', 'N/A'),
+                key.get('balance', 'N/A'),
+                key.get('totalIn', 'N/A'),
+                key.get('totalOut', 'N/A')
+            )
             TABLE_DATAS.append(infos)
-            count +=1
 
         table = SingleTable(TABLE_DATA, "ETH")
-        print("\n"+table.table)    
+        print("\n" + table.table)
 
         table = SingleTable(TABLE_DATAS, "TOKEN")
-        print("\n"+table.table)   
+        print("\n" + table.table)
 
 class ethereumNameIdentifier(Module):
     """ This module find ENS of Address
