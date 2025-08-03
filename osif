@@ -1,35 +1,47 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import re
-import sys 
-from sploitkit import *
-from tinyscript.helpers import is_bool, ExpiringDict, Path
-from tinyscript import *
+import sys
+
+try:
+    from sploitkit import *
+    from tinyscript.helpers import is_bool, ExpiringDict, Path
+    from tinyscript import *
+except ImportError as e:
+    print(f"Import error: {e}")
+    sys.exit(1)
 
 class OsifConsole(FrameworkConsole):
-    exclude = ["root/test", "root/helpe"]
+    exclude = ["root/test", "root/help"]  # Fixed typo
     sources = {'banners': "banners"}
-    
+
 __all__ = ["OsifConsole"]
 __script__ = "osif"
-__doc__    = """
+__doc__ = """
 Osif launcher script.
 """
 
-if __name__ == '__main__':
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="OSIF launcher script")
     parser.add_argument("-d", "--dev", action="store_true", help="enable development mode")
-    initialize(exit_at_interrupt=False)
-    
-    #add traceback   
-    sys.tracebacklimit=0
+    parser.add_argument("-v", "--verbose", action="store_true", help="enable verbose debug mode")
+    args = parser.parse_args()
 
-    #disable _pycachce_
+    initialize(exit_at_interrupt=False)
+
+    # Add traceback
+    sys.tracebacklimit = 0
+
+    # Disable .pyc files
     sys.dont_write_bytecode = True
 
     c = OsifConsole(
         "OSIF",
-        #TODO: configure your console settings
         banner_section_styles={'title': {'fgcolor': "lolcat"}},
         dev=args.dev,
         debug=args.verbose,
     )
     c.start()
+
+if __name__ == '__main__':
+    main()
