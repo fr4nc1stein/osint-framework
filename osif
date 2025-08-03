@@ -21,6 +21,28 @@ __script__ = "osif"
 __doc__ = """
 Osif launcher script.
 """
+def initialize_env():
+    env_path = os.path.join(os.path.dirname(__file__), ".env")
+    if not os.path.exists(env_path):
+        print("No .env file found. Let's set up your API keys.")
+        keys = [
+            "VT_API",
+            "CENSYS_APPID",
+            "CENSYS_SECRET",
+            "ABUSECH_API_KEY",
+            "SHODAN_API_KEY",
+            "HUNTER_API_KEY",
+            "BITCOINABUSE_API_KEY",
+            "WIGLE_API_NAME",
+            "WIGLE_API_TOKEN"
+        ]
+        with open(env_path, "w") as env_file:
+            for key in keys:
+                value = input(f"Enter value for {key}: ")
+                env_file.write(f'{key}="{value}"\n')
+        print(".env file created successfully!")
+    else:
+        print(".env file already exists. Skipping setup.")
 
 def main():
     import argparse
@@ -46,4 +68,5 @@ def main():
     c.start()
 
 if __name__ == '__main__':
+    initialize_env()
     main()
