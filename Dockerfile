@@ -1,4 +1,4 @@
-FROM python:3.14.0rc1-slim-bullseye
+FROM python:3.10.8-slim-bullseye
 
 LABEL maintainer = "laet4x|cadeath"
 LABEL website="laet4x.com"
@@ -14,9 +14,7 @@ RUN apt-get -y install build-essential git \
 
 
 COPY requirements.txt requirements.txt
-COPY .env.example .env
 RUN pip3 install -r requirements.txt
-RUN pip3 install --user --upgrade git+https://github.com/twintproject/twint.git@origin/master#egg=twint
 
 COPY . .
 
