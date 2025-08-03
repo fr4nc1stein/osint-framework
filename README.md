@@ -75,7 +75,7 @@ pip3 install -r requirements.txt
 Create .env
 1. Virustotal API https://www.virustotal.com/
 1. CENSYS API https://accounts.censys.io/ (under development)
-1. ABUSECH https://bazaar.abuse.ch/ (not required)
+1. ABUSECH https://abuse.ch (required)
 1. SHODAN API https://account.shodan.io/
 1. HUNTER API https://hunter.io/api-keys
 1. BITCOIN ABUSE API https://www.bitcoinabuse.com/
@@ -116,7 +116,6 @@ SECURITY_TRAIL_API = ""
 
         -=[ 1 api           ]=-
         -=[ 2 dns           ]=-
-        -=[ 1 social        ]=-
         -=[ 1 subdomain     ]=-
         -=[ 1 uncategorized ]=-
 
