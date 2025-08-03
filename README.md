@@ -141,7 +141,7 @@ laet4x
 cadeath
 
 
-**Note:**  
+# Note
 - `cchardet==2.2.0a2` may fail to build on Python 3.9+ due to [missing `longintrepr.h`](https://github.com/PyYoshi/cChardet/issues/81).  
   If you encounter build errors, use Python 3.8 or lower, or remove `cchardet` from `requirements.txt` and use `chardet` instead.
 
