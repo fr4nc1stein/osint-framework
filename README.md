@@ -140,3 +140,25 @@ osif dns(dns_records) >
 laet4x
 
 cadeath
+
+
+**Note:**  
+- `cchardet==2.2.0a2` may fail to build on Python 3.9+ due to [missing `longintrepr.h`](https://github.com/PyYoshi/cChardet/issues/81).  
+  If you encounter build errors, use Python 3.8 or lower, or remove `cchardet` from `requirements.txt` and use `chardet` instead.
+
+- `twint` is known to have installation issues and is not actively maintained.  
+  If you do not need Twitter scraping, remove `twint` from `requirements.txt`:
+
+  ```text
+  # twint
+  ```
+
+  If you need `twint`, consider using Python 3.7 or 3.8 and follow [Twint installation instructions](https://github.com/twintproject/twint#installation).
+
+## Troubleshooting
+
+- For `cchardet` errors:  
+  See [PyYoshi/cChardet Issue #81](https://github.com/PyYoshi/cChardet/issues/81).
+
+- For `twint` errors:  
+  Use older Python versions and check Twint’s GitHub issues for workarounds.
