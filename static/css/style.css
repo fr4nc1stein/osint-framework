@@ -324,3 +324,64 @@ hr {
 ::-webkit-scrollbar-thumb:hover {
     background: #555;
 }
+
+/* Context Menu */
+.context-menu {
+    position: fixed;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    z-index: 10000;
+    min-width: 120px;
+    overflow: hidden;
+    animation: contextMenuPop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.context-menu-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 13px;
+    font-weight: 500;
+    color: white;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.context-menu-item:last-child {
+    border-bottom: none;
+}
+
+.context-menu-item:hover {
+    background: rgba(255,255,255,0.2);
+    padding-left: 18px;
+}
+
+.menu-icon {
+    font-size: 14px;
+}
+
+@keyframes contextMenuPop {
+    from {
+        opacity: 0;
+        transform: scale(0.8) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}

@@ -112,6 +112,14 @@ function initNetwork() {
             }
         });
         
+        // Double-click to investigate node
+        network.on('doubleClick', function(params) {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                expandNode(nodeId);
+            }
+        });
+        
         // Fix node position when dragging starts
         network.on('dragStart', function(params) {
             if (params.nodes.length > 0) {
@@ -134,13 +142,6 @@ function initNetwork() {
                         fixed: {x: true, y: true}
                     });
                 });
-            }
-        });
-        
-        network.on('doubleClick', function(params) {
-            if (params.nodes.length > 0) {
-                const nodeId = params.nodes[0];
-                expandNode(nodeId);
             }
         });
         
@@ -172,7 +173,7 @@ function addNode(id, label, type, data = {}) {
         const isExpandable = expandableTypes.includes(type);
         
         // Add expand icon to label if expandable
-        const displayLabel = isExpandable ? `${label} ⊕` : label;
+        const displayLabel = isExpandable ? `${label} +` : label;
         
         nodes.add({
             id: id,
@@ -198,16 +199,59 @@ function addNode(id, label, type, data = {}) {
     }
 }
 
-// Add edge to graph
+// Add edge to graph with level-based styling
 function addEdge(from, to, label) {
     const edgeId = `${from}-${to}-${label}`;
     if (!edges.get(edgeId)) {
+        // Get source and target nodes to determine edge level
+        const fromNode = nodes.get(from);
+        const toNode = nodes.get(to);
+        
+        // Determine edge style based on relationship level
+        let edgeWidth = 1;
+        let edgeColor = '#95a5a6';
+        let dashPattern = false;
+        
+        if (fromNode && toNode) {
+            // Level 0 -> Level 1 (Domain to subdomain/IP/email)
+            if (fromNode.level === 0 && toNode.level === 1) {
+                edgeWidth = 2;
+                edgeColor = '#3498db';
+                dashPattern = [5, 5];
+            }
+            // Level 1 -> Level 2 (Subdomain to IP, etc.)
+            else if (fromNode.level === 1 && toNode.level === 2) {
+                edgeWidth = 1.5;
+                edgeColor = '#9b59b6';
+                dashPattern = [3, 3];
+            }
+            // Level 2 -> Level 3 or same level connections
+            else {
+                edgeWidth = 1;
+                edgeColor = '#95a5a6';
+                dashPattern = [2, 2];
+            }
+        }
+        
         edges.add({
             id: edgeId,
             from: from,
             to: to,
             label: label,
-            title: label
+            title: label,
+            width: edgeWidth,
+            color: {
+                color: edgeColor,
+                highlight: '#2c3e50',
+                hover: '#34495e'
+            },
+            dashes: dashPattern,
+            arrows: {
+                to: {
+                    enabled: true,
+                    scaleFactor: 0.4
+                }
+            }
         });
         updateStats();
     }
@@ -349,6 +393,15 @@ async function investigateBitcoin() {
 // Refresh graph from server
 async function refreshGraph() {
     try {
+        // Save current node positions before refresh
+        const currentPositions = {};
+        nodes.forEach(node => {
+            const pos = network.getPositions([node.id])[node.id];
+            if (pos) {
+                currentPositions[node.id] = {x: pos.x, y: pos.y, fixed: node.fixed};
+            }
+        });
+        
         const response = await fetch('/api/graph');
         const data = await response.json();
         
@@ -359,10 +412,20 @@ async function refreshGraph() {
         nodes.clear();
         edges.clear();
         
-        // Add nodes
+        // Add nodes with preserved positions
         data.nodes.forEach(node => {
             console.log('Adding node:', node.id, node.label, node.type);
             addNode(node.id, node.label, node.type, node.data);
+            
+            // Restore position if it existed before
+            if (currentPositions[node.id]) {
+                nodes.update({
+                    id: node.id,
+                    x: currentPositions[node.id].x,
+                    y: currentPositions[node.id].y,
+                    fixed: currentPositions[node.id].fixed || {x: true, y: true}
+                });
+            }
         });
         
         // Add edges
@@ -373,9 +436,10 @@ async function refreshGraph() {
         
         updateStats();
         
-        if (network) {
-            network.fit();
-        }
+        // Don't call fit() to preserve zoom and pan
+        // if (network) {
+        //     network.fit();
+        // }
         
         console.log('Graph refreshed. Vis.js nodes:', nodes.length, 'edges:', edges.length);
     } catch (error) {
@@ -444,7 +508,7 @@ async function expandNode(nodeId) {
     if (!node) return;
     
     // Remove expand icon from label to get clean value
-    const cleanLabel = node.label.replace(' ⊕', '').trim();
+    const cleanLabel = node.label.replace(' +', '').replace(' ⊕', '').trim();
     
     showLoading();
     showNotification(`🔍 Investigating ${node.type}: ${cleanLabel}`, 'info');
@@ -526,6 +590,78 @@ async function expandNode(nodeId) {
         showNotification(`❌ Error investigating ${cleanLabel}: ${error.message}`, 'error');
     } finally {
         hideLoading();
+    }
+}
+
+// Show context menu for node actions
+function showContextMenu(x, y, nodeId, node) {
+    // Remove any existing context menu
+    hideContextMenu();
+    
+    // Remove expand icon from label to get clean value
+    const cleanLabel = node.label.replace(' ⊕', '').trim();
+    
+    // Create context menu
+    const menu = document.createElement('div');
+    menu.id = 'node-context-menu';
+    menu.className = 'context-menu';
+    
+    // Create menu items
+    const investigateBtn = document.createElement('div');
+    investigateBtn.className = 'context-menu-item';
+    investigateBtn.innerHTML = `<span class="menu-icon">🔍</span> Investigate`;
+    investigateBtn.onclick = () => {
+        hideContextMenu();
+        expandNode(nodeId);
+    };
+    
+    const viewDetailsBtn = document.createElement('div');
+    viewDetailsBtn.className = 'context-menu-item';
+    viewDetailsBtn.innerHTML = '<span class="menu-icon">📋</span> Details';
+    viewDetailsBtn.onclick = () => {
+        hideContextMenu();
+        selectNode(nodeId);
+    };
+    
+    // Add menu items
+    menu.appendChild(investigateBtn);
+    menu.appendChild(viewDetailsBtn);
+    
+    // Position menu and check boundaries
+    document.body.appendChild(menu);
+    
+    // Get menu dimensions
+    const menuRect = menu.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Adjust position to keep menu within viewport
+    let finalX = x;
+    let finalY = y;
+    
+    // Check right boundary
+    if (x + menuRect.width > viewportWidth) {
+        finalX = x - menuRect.width - 50; // Show to the left instead
+    }
+    
+    // Check bottom boundary
+    if (y + menuRect.height > viewportHeight) {
+        finalY = y - menuRect.height;
+    }
+    
+    menu.style.left = finalX + 'px';
+    menu.style.top = finalY + 'px';
+    
+    // Close menu when clicking elsewhere
+    setTimeout(() => {
+        document.addEventListener('click', hideContextMenu, { once: true });
+    }, 100);
+}
+
+function hideContextMenu() {
+    const menu = document.getElementById('node-context-menu');
+    if (menu) {
+        menu.remove();
     }
 }
 
