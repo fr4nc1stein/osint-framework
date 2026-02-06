@@ -11,6 +11,7 @@ const nodeColors = {
     host: '#9b59b6',          // Purple - Hosts
     ip: '#e74c3c',            // Red - IP Addresses
     email: '#f39c12',         // Orange - Emails
+    error: '#c0392b',         // Dark Red - Errors/API Limits
     port: '#8e44ad',          // Dark Purple - Ports
     location: '#1abc9c',      // Teal - Locations
     isp: '#34495e',           // Dark Gray - ISP

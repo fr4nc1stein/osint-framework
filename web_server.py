@@ -135,79 +135,73 @@ def investigate_domain():
             except Exception as e:
                 pass  # Silently skip email search errors
         
-        # 2. Get DNS records
+        # 2. Get DNS records using dnspython (no API needed)
         try:
-            import requests
-            dns_response = requests.get(f"https://api.hackertarget.com/dnslookup/?q={domain}", timeout=5)
-            if dns_response.status_code == 200:
-                dns_lines = dns_response.text.strip().split('\n')
-                for line in dns_lines[:5]:  # Limit records
-                    if 'has address' in line or 'mail is handled' in line:
-                        parts = line.split()
-                        if len(parts) >= 4:
-                            ip = parts[-1].rstrip('.')
-                            ip_id = f"ip_{ip}"
-                            add_node(ip_id, ip, "ip", {"ip": ip})
-                            add_edge(domain_id, ip_id, "resolves_to")
-                            results["nodes"].append({"id": ip_id, "label": ip, "type": "ip"})
+            import dns.resolver
+            
+            # Query A records (IPv4)
+            try:
+                answers = dns.resolver.resolve(domain, 'A', lifetime=5)
+                for rdata in list(answers)[:5]:  # Limit to 5 IPs
+                    ip = str(rdata)
+                    ip_id = f"ip_{ip}"
+                    add_node(ip_id, ip, "ip", {"ip": ip, "record_type": "A"})
+                    add_edge(domain_id, ip_id, "resolves_to")
+                    results["nodes"].append({"id": ip_id, "label": ip, "type": "ip"})
+            except:
+                pass
+            
+            # Query MX records (Mail servers)
+            try:
+                mx_answers = dns.resolver.resolve(domain, 'MX', lifetime=5)
+                for rdata in list(mx_answers)[:3]:  # Limit to 3 MX
+                    mx_host = str(rdata.exchange).rstrip('.')
+                    mx_id = f"host_{mx_host}"
+                    add_node(mx_id, mx_host, "host", {"hostname": mx_host, "record_type": "MX", "priority": rdata.preference})
+                    add_edge(domain_id, mx_id, "mail_server")
+                    results["nodes"].append({"id": mx_id, "label": f"{mx_host} (MX)", "type": "host"})
+            except:
+                pass
         except Exception as e:
             pass  # Silently skip DNS lookup errors
         
-        # 3. Get subdomains
-        try:
-            import sublist3r
-            import sys
-            from io import StringIO
-            
-            # Capture stdout to suppress sublist3r output
-            old_stdout = sys.stdout
-            sys.stdout = StringIO()
-            
-            # Exclude DNSdumpster as it's causing errors - use only working engines
-            engines = ['baidu', 'yahoo', 'google', 'bing', 'ask', 'netcraft', 'virustotal', 'threatcrowd', 'ssl', 'passivedns']
-            
-            subdomains = sublist3r.main(domain, 20, None, ports=None, silent=True, verbose=False, enable_bruteforce=False, engines=engines)
-            
-            # Restore stdout
-            sys.stdout = old_stdout
-            
-            if subdomains:
-                for subdomain in subdomains[:10]:  # Limit to 10
-                    sub_id = f"subdomain_{subdomain}"
-                    add_node(sub_id, subdomain, "subdomain", {"subdomain": subdomain})
-                    add_edge(domain_id, sub_id, "has_subdomain")
-                    results["nodes"].append({"id": sub_id, "label": subdomain, "type": "subdomain"})
-        except Exception as e:
-            pass  # Silently skip subdomain enumeration errors
-        
-        # 4. Get DNS hosts using hackertarget hostsearch
+        # 3. Get subdomains/hosts from Certificate Transparency (crt.sh - unlimited, free)
         try:
             import requests
-            host_response = requests.get(f"https://api.hackertarget.com/hostsearch/?q={domain}", timeout=5)
-            if host_response.status_code == 200:
-                host_lines = host_response.text.strip().split('\n')
-                for line in host_lines[:15]:  # Limit to 15 hosts
-                    if line and ',' in line:
-                        parts = line.split(',')
-                        if len(parts) >= 2:
-                            hostname = parts[0].strip()
-                            host_ip = parts[1].strip()
-                            
-                            # Add hostname node
-                            if hostname and hostname != domain:
-                                host_id = f"host_{hostname}"
-                                add_node(host_id, hostname, "host", {"hostname": hostname, "ip": host_ip})
-                                add_edge(domain_id, host_id, "has_host")
-                                results["nodes"].append({"id": host_id, "label": hostname, "type": "host"})
+            crt_url = f"https://crt.sh/?q=%.{domain}&output=json"
+            crt_response = requests.get(crt_url, timeout=10)
+            
+            if crt_response.status_code == 200:
+                crt_data = crt_response.json()
+                seen_hosts = set()
+                
+                for cert in crt_data[:50]:  # Limit to 50 certificates
+                    # Extract from name_value (can be multiline)
+                    if 'name_value' in cert:
+                        names = cert['name_value'].split('\n')
+                        for name in names:
+                            name = name.strip().lower()
+                            # Only add valid subdomains/hosts
+                            if name and domain in name and name not in seen_hosts and name != domain:
+                                seen_hosts.add(name)
                                 
-                                # Add IP node for the host
-                                if host_ip:
-                                    ip_id = f"ip_{host_ip}"
-                                    # Check if IP node doesn't exist yet
-                                    if not any(n["id"] == ip_id for n in graph_data["nodes"]):
-                                        add_node(ip_id, host_ip, "ip", {"ip": host_ip})
-                                        results["nodes"].append({"id": ip_id, "label": host_ip, "type": "ip"})
-                                    add_edge(host_id, ip_id, "resolves_to")
+                                # Determine if subdomain or host
+                                node_type = "subdomain" if name.endswith(f".{domain}") else "host"
+                                host_id = f"{node_type}_{name}"
+                                
+                                add_node(host_id, name, node_type, {
+                                    "hostname": name,
+                                    "source": "crt.sh",
+                                    "issuer": cert.get('issuer_name', '')[:50]
+                                })
+                                add_edge(domain_id, host_id, "has_certificate")
+                                results["nodes"].append({"id": host_id, "label": name, "type": node_type})
+                                
+                                if len(seen_hosts) >= 15:  # Limit to 15 unique hosts
+                                    break
+                    
+                    if len(seen_hosts) >= 15:
+                        break
         except Exception as e:
             pass  # Silently skip host search errors
         
