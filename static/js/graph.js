@@ -167,9 +167,16 @@ function addNode(id, label, type, data = {}) {
             level = 2; // Everything else at second level
         }
         
+        // Check if node type is expandable
+        const expandableTypes = ['domain', 'subdomain', 'ip', 'email', 'bitcoin', 'host'];
+        const isExpandable = expandableTypes.includes(type);
+        
+        // Add expand icon to label if expandable
+        const displayLabel = isExpandable ? `${label} ⊕` : label;
+        
         nodes.add({
             id: id,
-            label: label,
+            label: displayLabel,
             level: level,  // Hierarchical level
             color: {
                 background: nodeColors[type] || nodeColors.default,
@@ -181,7 +188,11 @@ function addNode(id, label, type, data = {}) {
             },
             type: type,
             data: data,
-            title: `${type}: ${label}` // Tooltip
+            title: `${type}: ${label}\n${isExpandable ? 'Double-click to investigate' : ''}`,
+            font: {
+                size: isExpandable ? 15 : 14,
+                bold: isExpandable
+            }
         });
         updateStats();
     }
@@ -427,29 +438,95 @@ function displayNodeDetails(node, edgesFrom, edgesTo) {
     detailsDiv.innerHTML = html;
 }
 
-// Expand node (investigate further)
-function expandNode(nodeId) {
+// Expand node (investigate further) - automatically run investigation
+async function expandNode(nodeId) {
     const node = nodes.get(nodeId);
     if (!node) return;
     
-    // Auto-fill the appropriate input based on node type
-    switch(node.type) {
-        case 'domain':
-        case 'subdomain':
-            document.getElementById('domain-input').value = node.label;
-            break;
-        case 'ip':
-            document.getElementById('ip-input').value = node.label;
-            break;
-        case 'email':
-            document.getElementById('email-input').value = node.label;
-            break;
-        case 'bitcoin':
-            document.getElementById('bitcoin-input').value = node.data.address || node.label;
-            break;
-    }
+    // Remove expand icon from label to get clean value
+    const cleanLabel = node.label.replace(' ⊕', '').trim();
     
-    showNotification(`Double-click detected! Input filled with: ${node.label}`, 'info');
+    showLoading();
+    showNotification(`🔍 Investigating ${node.type}: ${cleanLabel}`, 'info');
+    
+    try {
+        // Automatically run investigation based on node type
+        switch(node.type) {
+            case 'domain':
+            case 'subdomain':
+            case 'host':
+                // Run domain investigation
+                const domainResponse = await fetch('/api/investigate/domain', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({domain: cleanLabel})
+                });
+                const domainData = await domainResponse.json();
+                if (domainData.status === 'success') {
+                    await refreshGraph();
+                    showNotification(`✅ Found ${domainData.nodes?.length || 0} new connections for ${cleanLabel}`, 'success');
+                } else {
+                    showNotification('Investigation completed with no new data', 'info');
+                }
+                break;
+                
+            case 'ip':
+                // Run IP investigation
+                const ipResponse = await fetch('/api/investigate/ip', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ip: cleanLabel})
+                });
+                const ipData = await ipResponse.json();
+                if (ipData.status === 'success') {
+                    await refreshGraph();
+                    showNotification(`✅ Found ${ipData.nodes?.length || 0} new connections for ${cleanLabel}`, 'success');
+                } else {
+                    showNotification('Investigation completed with no new data', 'info');
+                }
+                break;
+                
+            case 'email':
+                // Run email investigation
+                const emailResponse = await fetch('/api/investigate/email', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email: cleanLabel})
+                });
+                const emailData = await emailResponse.json();
+                if (emailData.status === 'success') {
+                    await refreshGraph();
+                    showNotification(`✅ Email investigation completed for ${cleanLabel}`, 'success');
+                } else {
+                    showNotification('Investigation completed with no new data', 'info');
+                }
+                break;
+                
+            case 'bitcoin':
+                // Run bitcoin investigation
+                const btcAddress = node.data.address || cleanLabel;
+                const btcResponse = await fetch('/api/investigate/bitcoin', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({address: btcAddress})
+                });
+                const btcData = await btcResponse.json();
+                if (btcData.status === 'success') {
+                    await refreshGraph();
+                    showNotification(`✅ Bitcoin investigation completed`, 'success');
+                } else {
+                    showNotification('Investigation completed with no new data', 'info');
+                }
+                break;
+                
+            default:
+                showNotification(`Node type '${node.type}' cannot be expanded further`, 'info');
+        }
+    } catch (error) {
+        showNotification(`❌ Error investigating ${cleanLabel}: ${error.message}`, 'error');
+    } finally {
+        hideLoading();
+    }
 }
 
 // Clear graph
