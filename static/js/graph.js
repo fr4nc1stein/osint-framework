@@ -86,18 +86,54 @@ function initNetwork() {
                 hover: true,
                 tooltipDelay: 200,
                 navigationButtons: true,
-                keyboard: true
+                keyboard: true,
+                dragNodes: true,
+                dragView: true
+            },
+            manipulation: {
+                enabled: false
             }
         };
         
         network = new vis.Network(container, data, options);
         console.log('Graph network initialized successfully');
         
+        // Disable physics after initial stabilization to allow free dragging
+        network.once('stabilizationIterationsDone', function() {
+            network.setOptions({physics: false});
+            console.log('Graph stabilized - physics disabled for free dragging');
+        });
+        
         // Event listeners
         network.on('click', function(params) {
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0];
                 selectNode(nodeId);
+            }
+        });
+        
+        // Fix node position when dragging starts
+        network.on('dragStart', function(params) {
+            if (params.nodes.length > 0) {
+                params.nodes.forEach(function(nodeId) {
+                    nodes.update({id: nodeId, fixed: {x: false, y: false}});
+                });
+            }
+        });
+        
+        // Keep node fixed where user drops it
+        network.on('dragEnd', function(params) {
+            if (params.nodes.length > 0) {
+                params.nodes.forEach(function(nodeId) {
+                    const positions = network.getPositions([nodeId]);
+                    const pos = positions[nodeId];
+                    nodes.update({
+                        id: nodeId, 
+                        x: pos.x, 
+                        y: pos.y,
+                        fixed: {x: true, y: true}
+                    });
+                });
             }
         });
         
@@ -115,12 +151,26 @@ function initNetwork() {
     }
 }
 
-// Add node to graph
+// Add node to graph with hierarchical level
 function addNode(id, label, type, data = {}) {
     if (!nodes.get(id)) {
+        // Determine hierarchical level based on type
+        let level = 2; // Default level
+        
+        if (type === 'domain') {
+            level = 0; // Root/parent level
+        } else if (['ip', 'subdomain', 'host', 'email'].includes(type)) {
+            level = 1; // First child level
+        } else if (['port', 'hostname', 'location', 'isp', 'technology'].includes(type)) {
+            level = 2; // Second child level (sub-children)
+        } else {
+            level = 2; // Everything else at second level
+        }
+        
         nodes.add({
             id: id,
             label: label,
+            level: level,  // Hierarchical level
             color: {
                 background: nodeColors[type] || nodeColors.default,
                 border: darkenColor(nodeColors[type] || nodeColors.default),

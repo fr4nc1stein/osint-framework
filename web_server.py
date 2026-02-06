@@ -168,6 +168,7 @@ def investigate_domain():
         # 3. Get subdomains/hosts from Certificate Transparency (crt.sh - unlimited, free)
         try:
             import requests
+            import dns.resolver
             crt_url = f"https://crt.sh/?q=%.{domain}&output=json"
             crt_response = requests.get(crt_url, timeout=10)
             
@@ -196,6 +197,27 @@ def investigate_domain():
                                 })
                                 add_edge(domain_id, host_id, "has_certificate")
                                 results["nodes"].append({"id": host_id, "label": name, "type": node_type})
+                                
+                                # 3rd LEVEL: Get IPs for each subdomain/host (limit to first 5 subdomains)
+                                if len(seen_hosts) <= 5:
+                                    try:
+                                        subdomain_answers = dns.resolver.resolve(name, 'A', lifetime=3)
+                                        for rdata in list(subdomain_answers)[:2]:  # Limit to 2 IPs per subdomain
+                                            subdomain_ip = str(rdata)
+                                            subdomain_ip_id = f"ip_{subdomain_ip}"
+                                            
+                                            # Add IP node if not exists
+                                            if not any(n["id"] == subdomain_ip_id for n in graph_data["nodes"]):
+                                                add_node(subdomain_ip_id, subdomain_ip, "ip", {
+                                                    "ip": subdomain_ip,
+                                                    "parent_subdomain": name
+                                                })
+                                                results["nodes"].append({"id": subdomain_ip_id, "label": subdomain_ip, "type": "ip"})
+                                            
+                                            # Create edge from subdomain to IP
+                                            add_edge(host_id, subdomain_ip_id, "resolves_to")
+                                    except:
+                                        pass  # Skip DNS errors for subdomains
                                 
                                 if len(seen_hosts) >= 15:  # Limit to 15 unique hosts
                                     break
