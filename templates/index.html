@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSIF - Graph Visualization</title>
+    <!-- Vis.js for graph visualization -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🕵️ OSIF - Intelligence Graph</h1>
+            <p>Maltego-style OSINT Visualization</p>
+        </header>
+
+        <!-- Main content -->
+        <div class="main-content">
+            <!-- Left Sidebar - Investigation Panel -->
+            <aside class="sidebar">
+                <div class="panel">
+                    <h2>🔍 Investigate</h2>
+                    
+                    <!-- Domain Investigation -->
+                    <div class="investigation-form">
+                        <h3>Domain</h3>
+                        <input type="text" id="domain-input" placeholder="example.com" class="input-field">
+                        <button onclick="investigateDomain()" class="btn btn-primary">🌐 Investigate</button>
+                    </div>
+
+                    <!-- IP Investigation -->
+                    <div class="investigation-form">
+                        <h3>IP Address</h3>
+                        <input type="text" id="ip-input" placeholder="8.8.8.8" class="input-field">
+                        <button onclick="investigateIP()" class="btn btn-primary">📍 Investigate</button>
+                    </div>
+
+                    <!-- Email Investigation -->
+                    <div class="investigation-form">
+                        <h3>Email</h3>
+                        <input type="text" id="email-input" placeholder="user@example.com" class="input-field">
+                        <button onclick="investigateEmail()" class="btn btn-primary">✉️ Investigate</button>
+                    </div>
+
+                    <!-- Bitcoin Investigation -->
+                    <div class="investigation-form">
+                        <h3>Bitcoin Address</h3>
+                        <input type="text" id="bitcoin-input" placeholder="1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa" class="input-field">
+                        <button onclick="investigateBitcoin()" class="btn btn-primary">₿ Investigate</button>
+                    <hr>
+
+                    <!-- Actions -->
+                    <div class="actions">
+                        <button onclick="clearGraph()" class="btn btn-danger">🗑️ Clear Graph</button>
+                        <button onclick="exportGraph()" class="btn btn-success">💾 Export</button>
+                        <button onclick="fitView()" class="btn btn-secondary">🔍 Fit View</button>
+                    </div>
+
+                    <!-- Stats -->
+                    <div class="stats">
+                        <h3>📊 Statistics</h3>
+                        <p>Nodes: <span id="node-count">0</span></p>
+                        <p>Edges: <span id="edge-count">0</span></p>
+                        <p>Selected: <span id="selected-label">None</span></p>
+                    </div>
+                    
+                    <!-- Legend -->
+                    <div class="legend">
+                        <h3>🎨 Node Types</h3>
+                        <div class="legend-item"><span class="legend-color" style="background: #2980b9;"></span> Domain</div>
+                        <div class="legend-item"><span class="legend-color" style="background: #3498db;"></span> Subdomain</div>
+                        <div class="legend-item"><span class="legend-color" style="background: #9b59b6;"></span> Host</div>
+                        <div class="legend-item"><span class="legend-color" style="background: #e74c3c;"></span> IP Address</div>
+                        <div class="legend-item"><span class="legend-color" style="background: #f39c12;"></span> Email</div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Center - Graph Visualization -->
+            <main class="graph-container">
+                <div id="mynetwork"></div>
+                <div id="loading" class="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Investigating...</p>
+                </div>
+            </main>
+
+            <!-- Right Sidebar - Node Details -->
+            <aside class="sidebar-right">
+                <div class="panel">
+                    <h2>ℹ️ Node Details</h2>
+                    <div id="node-details">
+                        <p class="placeholder">Click on a node to see details</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/graph.js') }}"></script>
+</body>
+</html>

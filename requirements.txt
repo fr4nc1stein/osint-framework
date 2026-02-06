@@ -14,3 +14,11 @@ jellyfish
 prettytable
 async_timeout==3.0.1
 tomba-io
+flask
+flask-cors
+requests
+
+# Web server dependencies
+flask>=2.3.0
+flask-cors>=4.0.0
+requests>=2.31.0
