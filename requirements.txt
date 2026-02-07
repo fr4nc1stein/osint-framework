@@ -14,3 +14,4 @@ jellyfish
 prettytable
 async_timeout==3.0.1
 tomba-io
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
