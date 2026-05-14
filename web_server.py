@@ -421,21 +421,38 @@ def export_graph():
         "edge_count": len(graph_data["edges"])
     })
 
-def open_browser():
+def open_browser(port):
     """Open browser after short delay"""
     import time
     time.sleep(1.5)
-    webbrowser.open('http://localhost:5001')
+    webbrowser.open(f'http://localhost:{port}')
 
 if __name__ == '__main__':
+    import argparse
+    import socket
+    
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='OSIF Web Server - Graph Visualization')
+    parser.add_argument('--port', type=int, default=5001, help='Port to run the server on (default: 5001)')
+    args = parser.parse_args()
+    
+    port = args.port
+    
     print("=" * 60)
     print("🌐 OSIF Web Server - Graph Visualization")
     print("=" * 60)
-    print("Starting server at http://localhost:5001")
+    print(f"Starting server at http://localhost:{port}")
     print("Press Ctrl+C to stop")
     print("=" * 60)
     
     # Open browser in background
-    threading.Thread(target=open_browser, daemon=True).start()
+    threading.Thread(target=lambda: open_browser(port), daemon=True).start()
     
-    app.run(host='0.0.0.0', port=5001, debug=True, use_reloader=False)
+    try:
+        app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)
+    except OSError as e:
+        if "Address already in use" in str(e):
+            print(f"\n❌ Port {port} is already in use!")
+            print(f"💡 Try running with a different port: python3 web_server.py --port {port + 1}")
+        else:
+            raise
