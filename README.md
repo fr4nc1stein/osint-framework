@@ -153,6 +153,7 @@ Create .env
 1. WIGEL API https://wigle.net/ (geolocation module)
 1. SECURITY TRAIL API https://securitytrails.com/
 1. TOMBA API https://tomba.io/
+1. ABUSEIPDB API https://www.abuseipdb.com/
 
 ```
 VT_API=""
@@ -167,6 +168,7 @@ WIGLE_API_TOKEN = ""
 SECURITY_TRAIL_API = ""
 TOMBA_API_KEY=""
 TOMBA_SECRET_KEY=""
+ABUSEIPDB_API_KEY=""
 
 # Web Server (optional)
 SECRET_KEY="your-secret-key-here"

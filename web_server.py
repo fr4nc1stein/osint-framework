@@ -288,7 +288,54 @@ def investigate_ip():
                 add_edge(ip_id, isp_id, "provided_by")
                 results["nodes"].append({"id": isp_id, "label": isp, "type": "isp"})
         
-        # 2. Shodan lookup (if available)
+        # 2. AbuseIPDB reputation check (if available)
+        if os.getenv('ABUSEIPDB_API_KEY'):
+            try:
+                import requests
+                abuseipdb_url = 'https://api.abuseipdb.com/api/v2/check'
+                abuseipdb_headers = {
+                    'Accept': 'application/json',
+                    'Key': os.getenv('ABUSEIPDB_API_KEY')
+                }
+                abuseipdb_params = {
+                    'ipAddress': ip,
+                    'maxAgeInDays': 90,
+                    'verbose': False
+                }
+                
+                abuseipdb_response = requests.get(abuseipdb_url, headers=abuseipdb_headers, 
+                                                  params=abuseipdb_params, timeout=10)
+                
+                if abuseipdb_response.status_code == 200:
+                    abuseipdb_data = abuseipdb_response.json().get('data', {})
+                    
+                    # Update IP node with reputation data
+                    node = next((n for n in graph_data["nodes"] if n["id"] == ip_id), None)
+                    if node:
+                        node["data"]["abuseipdb"] = {
+                            "abuse_score": abuseipdb_data.get('abuseConfidenceScore', 0),
+                            "total_reports": abuseipdb_data.get('totalReports', 0),
+                            "is_whitelisted": abuseipdb_data.get('isWhitelisted', False),
+                            "usage_type": abuseipdb_data.get('usageType', 'Unknown')
+                        }
+                    
+                    # Add threat node if abuse score is significant
+                    abuse_score = abuseipdb_data.get('abuseConfidenceScore', 0)
+                    if abuse_score > 25:
+                        threat_level = "High Risk" if abuse_score >= 75 else "Medium Risk"
+                        threat_id = f"threat_{ip}"
+                        add_node(threat_id, f"{threat_level} ({abuse_score}%)", "threat", {
+                            "abuse_score": abuse_score,
+                            "total_reports": abuseipdb_data.get('totalReports', 0),
+                            "threat_level": threat_level
+                        })
+                        add_edge(ip_id, threat_id, "has_reputation")
+                        results["nodes"].append({"id": threat_id, "label": f"{threat_level}", "type": "threat"})
+                        
+            except Exception as e:
+                pass  # Silently skip AbuseIPDB errors
+        
+        # 3. Shodan lookup (if available)
         if os.getenv('SHODAN_API_KEY'):
             try:
                 from shodan import Shodan
