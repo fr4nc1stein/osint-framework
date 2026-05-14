@@ -1,0 +1,782 @@
+// OSIF Graph Visualization
+let network = null;
+let nodes = new vis.DataSet([]);
+let edges = new vis.DataSet([]);
+let selectedNode = null;
+
+// Node colors by type
+const nodeColors = {
+    domain: '#2980b9',        // Blue - Main domain
+    subdomain: '#3498db',     // Light Blue - Subdomains
+    host: '#9b59b6',          // Purple - Hosts
+    ip: '#e74c3c',            // Red - IP Addresses
+    email: '#f39c12',         // Orange - Emails
+    error: '#c0392b',         // Dark Red - Errors/API Limits
+    port: '#8e44ad',          // Dark Purple - Ports
+    location: '#1abc9c',      // Teal - Locations
+    isp: '#34495e',           // Dark Gray - ISP
+    organization: '#16a085',  // Dark Teal - Organizations
+    technology: '#27ae60',    // Green - Technologies
+    bitcoin: '#f1c40f',       // Gold - Bitcoin
+    ethereum: '#9b59b6',      // Purple - Ethereum
+    balance: '#d35400',       // Orange-Red - Balance
+    hostname: '#5dade2',      // Sky Blue - Hostnames
+    phone: '#c0392b',         // Dark Red - Phone
+    hash: '#7f8c8d',          // Gray - Hashes
+    default: '#95a5a6'        // Light Gray - Default
+};
+
+// Initialize the network
+function initNetwork() {
+    try {
+        console.log('Initializing OSIF Graph...');
+        
+        const container = document.getElementById('mynetwork');
+        if (!container) {
+            console.error('Graph container #mynetwork not found!');
+            return;
+        }
+        
+        const data = {
+            nodes: nodes,
+            edges: edges
+        };
+        
+        const options = {
+            nodes: {
+                shape: 'dot',
+                size: 20,
+                font: {
+                    size: 14,
+                    color: '#2c3e50'
+                },
+                borderWidth: 2,
+                shadow: true
+            },
+            edges: {
+                width: 2,
+                color: {
+                    color: '#95a5a6',
+                    highlight: '#2c3e50'
+                },
+                arrows: {
+                    to: {enabled: true, scaleFactor: 0.5}
+                },
+                font: {
+                    size: 11,
+                    align: 'middle'
+                },
+                smooth: {
+                    type: 'continuous'
+                }
+            },
+            physics: {
+                enabled: true,
+                barnesHut: {
+                    gravitationalConstant: -8000,
+                    centralGravity: 0.3,
+                    springLength: 150,
+                    springConstant: 0.04
+                },
+                stabilization: {
+                    iterations: 150
+                }
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 200,
+                navigationButtons: true,
+                keyboard: true,
+                dragNodes: true,
+                dragView: true
+            },
+            manipulation: {
+                enabled: false
+            }
+        };
+        
+        network = new vis.Network(container, data, options);
+        console.log('Graph network initialized successfully');
+        
+        // Disable physics after initial stabilization to allow free dragging
+        network.once('stabilizationIterationsDone', function() {
+            network.setOptions({physics: false});
+            console.log('Graph stabilized - physics disabled for free dragging');
+        });
+        
+        // Event listeners
+        network.on('click', function(params) {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                selectNode(nodeId);
+            }
+        });
+        
+        // Double-click to investigate node
+        network.on('doubleClick', function(params) {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                expandNode(nodeId);
+            }
+        });
+        
+        // Fix node position when dragging starts
+        network.on('dragStart', function(params) {
+            if (params.nodes.length > 0) {
+                params.nodes.forEach(function(nodeId) {
+                    nodes.update({id: nodeId, fixed: {x: false, y: false}});
+                });
+            }
+        });
+        
+        // Keep node fixed where user drops it
+        network.on('dragEnd', function(params) {
+            if (params.nodes.length > 0) {
+                params.nodes.forEach(function(nodeId) {
+                    const positions = network.getPositions([nodeId]);
+                    const pos = positions[nodeId];
+                    nodes.update({
+                        id: nodeId, 
+                        x: pos.x, 
+                        y: pos.y,
+                        fixed: {x: true, y: true}
+                    });
+                });
+            }
+        });
+        
+        updateStats();
+        console.log('Graph initialization complete');
+    } catch (error) {
+        console.error('Error initializing graph:', error);
+    }
+}
+
+// Add node to graph with hierarchical level
+function addNode(id, label, type, data = {}) {
+    if (!nodes.get(id)) {
+        // Determine hierarchical level based on type
+        let level = 2; // Default level
+        
+        if (type === 'domain') {
+            level = 0; // Root/parent level
+        } else if (['ip', 'subdomain', 'host', 'email'].includes(type)) {
+            level = 1; // First child level
+        } else if (['port', 'hostname', 'location', 'isp', 'technology'].includes(type)) {
+            level = 2; // Second child level (sub-children)
+        } else {
+            level = 2; // Everything else at second level
+        }
+        
+        // Check if node type is expandable
+        const expandableTypes = ['domain', 'subdomain', 'ip', 'email', 'bitcoin', 'host'];
+        const isExpandable = expandableTypes.includes(type);
+        
+        // Add expand icon to label if expandable
+        const displayLabel = isExpandable ? `${label} +` : label;
+        
+        nodes.add({
+            id: id,
+            label: displayLabel,
+            level: level,  // Hierarchical level
+            color: {
+                background: nodeColors[type] || nodeColors.default,
+                border: darkenColor(nodeColors[type] || nodeColors.default),
+                highlight: {
+                    background: lightenColor(nodeColors[type] || nodeColors.default),
+                    border: nodeColors[type] || nodeColors.default
+                }
+            },
+            type: type,
+            data: data,
+            title: `${type}: ${label}\n${isExpandable ? 'Double-click to investigate' : ''}`,
+            font: {
+                size: isExpandable ? 15 : 14,
+                bold: isExpandable
+            }
+        });
+        updateStats();
+    }
+}
+
+// Add edge to graph with level-based styling
+function addEdge(from, to, label) {
+    const edgeId = `${from}-${to}-${label}`;
+    if (!edges.get(edgeId)) {
+        // Get source and target nodes to determine edge level
+        const fromNode = nodes.get(from);
+        const toNode = nodes.get(to);
+        
+        // Determine edge style based on relationship level
+        let edgeWidth = 1;
+        let edgeColor = '#95a5a6';
+        let dashPattern = false;
+        
+        if (fromNode && toNode) {
+            // Level 0 -> Level 1 (Domain to subdomain/IP/email)
+            if (fromNode.level === 0 && toNode.level === 1) {
+                edgeWidth = 2;
+                edgeColor = '#3498db';
+                dashPattern = [5, 5];
+            }
+            // Level 1 -> Level 2 (Subdomain to IP, etc.)
+            else if (fromNode.level === 1 && toNode.level === 2) {
+                edgeWidth = 1.5;
+                edgeColor = '#9b59b6';
+                dashPattern = [3, 3];
+            }
+            // Level 2 -> Level 3 or same level connections
+            else {
+                edgeWidth = 1;
+                edgeColor = '#95a5a6';
+                dashPattern = [2, 2];
+            }
+        }
+        
+        edges.add({
+            id: edgeId,
+            from: from,
+            to: to,
+            label: label,
+            title: label,
+            width: edgeWidth,
+            color: {
+                color: edgeColor,
+                highlight: '#2c3e50',
+                hover: '#34495e'
+            },
+            dashes: dashPattern,
+            arrows: {
+                to: {
+                    enabled: true,
+                    scaleFactor: 0.4
+                }
+            }
+        });
+        updateStats();
+    }
+}
+
+// Investigate Domain
+async function investigateDomain() {
+    const domain = document.getElementById('domain-input').value.trim();
+    if (!domain) {
+        alert('Please enter a domain');
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        const response = await fetch('/api/investigate/domain', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({domain: domain})
+        });
+        
+        const data = await response.json();
+        
+        console.log('Domain investigation response:', data);
+        
+        if (data.status === 'success') {
+            // Main domain node is already added by backend
+            await refreshGraph();
+            const msg = `Domain ${domain} investigated! Found ${data.total_nodes || 0} total nodes, ${data.total_edges || 0} edges`;
+            showNotification(msg, 'success');
+            console.log(msg);
+        } else {
+            showNotification('Investigation failed: ' + (data.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        showNotification('Error: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Investigate IP
+async function investigateIP() {
+    const ip = document.getElementById('ip-input').value.trim();
+    if (!ip) {
+        alert('Please enter an IP address');
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        const response = await fetch('/api/investigate/ip', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ip: ip})
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            refreshGraph();
+            showNotification(`IP ${ip} investigated successfully!`, 'success');
+        } else {
+            showNotification('Investigation failed: ' + (data.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        showNotification('Error: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Investigate Email
+async function investigateEmail() {
+    const email = document.getElementById('email-input').value.trim();
+    if (!email) {
+        alert('Please enter an email address');
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        const response = await fetch('/api/investigate/email', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({email: email})
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            refreshGraph();
+            showNotification(`Email ${email} investigated successfully!`, 'success');
+        } else {
+            showNotification('Investigation failed: ' + (data.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        showNotification('Error: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Investigate Bitcoin
+async function investigateBitcoin() {
+    const address = document.getElementById('bitcoin-input').value.trim();
+    if (!address) {
+        alert('Please enter a Bitcoin address');
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        const response = await fetch('/api/investigate/bitcoin', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({address: address})
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            refreshGraph();
+            showNotification(`Bitcoin address investigated! Balance: ${data.balance} BTC`, 'success');
+        } else {
+            showNotification('Investigation failed: ' + (data.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        showNotification('Error: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Refresh graph from server
+async function refreshGraph() {
+    try {
+        // Save current node positions before refresh
+        const currentPositions = {};
+        nodes.forEach(node => {
+            const pos = network.getPositions([node.id])[node.id];
+            if (pos) {
+                currentPositions[node.id] = {x: pos.x, y: pos.y, fixed: node.fixed};
+            }
+        });
+        
+        const response = await fetch('/api/graph');
+        const data = await response.json();
+        
+        console.log('Refreshing graph with data:', data);
+        console.log('Nodes:', data.nodes.length, 'Edges:', data.edges.length);
+        
+        // Clear and reload
+        nodes.clear();
+        edges.clear();
+        
+        // Add nodes with preserved positions
+        data.nodes.forEach(node => {
+            console.log('Adding node:', node.id, node.label, node.type);
+            addNode(node.id, node.label, node.type, node.data);
+            
+            // Restore position if it existed before
+            if (currentPositions[node.id]) {
+                nodes.update({
+                    id: node.id,
+                    x: currentPositions[node.id].x,
+                    y: currentPositions[node.id].y,
+                    fixed: currentPositions[node.id].fixed || {x: true, y: true}
+                });
+            }
+        });
+        
+        // Add edges
+        data.edges.forEach(edge => {
+            console.log('Adding edge:', edge.from, '->', edge.to, '(' + edge.relationship + ')');
+            addEdge(edge.from, edge.to, edge.relationship);
+        });
+        
+        updateStats();
+        
+        // Don't call fit() to preserve zoom and pan
+        // if (network) {
+        //     network.fit();
+        // }
+        
+        console.log('Graph refreshed. Vis.js nodes:', nodes.length, 'edges:', edges.length);
+    } catch (error) {
+        console.error('Error refreshing graph:', error);
+    }
+}
+
+// Select and show node details
+async function selectNode(nodeId) {
+    selectedNode = nodeId;
+    
+    try {
+        const response = await fetch(`/api/node/${nodeId}`);
+        const data = await response.json();
+        
+        if (data.node) {
+            displayNodeDetails(data.node, data.edges_from, data.edges_to);
+        }
+    } catch (error) {
+        console.error('Error fetching node details:', error);
+    }
+}
+
+// Display node details
+function displayNodeDetails(node, edgesFrom, edgesTo) {
+    const detailsDiv = document.getElementById('node-details');
+    document.getElementById('selected-label').textContent = node.label;
+    
+    let html = `
+        <span class="node-type-badge">${node.type.toUpperCase()}</span>
+        <div class="detail-item">
+            <div class="detail-label">Label</div>
+            <div class="detail-value">${node.label}</div>
+        </div>
+        <div class="detail-item">
+            <div class="detail-label">ID</div>
+            <div class="detail-value" style="font-size: 0.8rem;">${node.id}</div>
+        </div>
+    `;
+    
+    // Display data fields
+    if (node.data && Object.keys(node.data).length > 0) {
+        for (const [key, value] of Object.entries(node.data)) {
+            if (value !== null && value !== undefined && value !== '') {
+                html += `
+                    <div class="detail-item">
+                        <div class="detail-label">${key.replace(/_/g, ' ').toUpperCase()}</div>
+                        <div class="detail-value">${JSON.stringify(value)}</div>
+                    </div>
+                `;
+            }
+        }
+    }
+    
+    // Connections
+    html += `<h3 style="margin-top: 1rem;">🔗 Connections</h3>`;
+    html += `<p><strong>Outgoing:</strong> ${edgesFrom.length}</p>`;
+    html += `<p><strong>Incoming:</strong> ${edgesTo.length}</p>`;
+    
+    detailsDiv.innerHTML = html;
+}
+
+// Expand node (investigate further) - automatically run investigation
+async function expandNode(nodeId) {
+    const node = nodes.get(nodeId);
+    if (!node) return;
+    
+    // Remove expand icon from label to get clean value
+    const cleanLabel = node.label.replace(' +', '').replace(' ⊕', '').trim();
+    
+    showLoading();
+    showNotification(`🔍 Investigating ${node.type}: ${cleanLabel}`, 'info');
+    
+    try {
+        // Automatically run investigation based on node type
+        switch(node.type) {
+            case 'domain':
+            case 'subdomain':
+            case 'host':
+                // Run domain investigation
+                const domainResponse = await fetch('/api/investigate/domain', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({domain: cleanLabel})
+                });
+                const domainData = await domainResponse.json();
+                if (domainData.status === 'success') {
+                    await refreshGraph();
+                    showNotification(`✅ Found ${domainData.nodes?.length || 0} new connections for ${cleanLabel}`, 'success');
+                } else {
+                    showNotification('Investigation completed with no new data', 'info');
+                }
+                break;
+                
+            case 'ip':
+                // Run IP investigation
+                const ipResponse = await fetch('/api/investigate/ip', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ip: cleanLabel})
+                });
+                const ipData = await ipResponse.json();
+                if (ipData.status === 'success') {
+                    await refreshGraph();
+                    showNotification(`✅ Found ${ipData.nodes?.length || 0} new connections for ${cleanLabel}`, 'success');
+                } else {
+                    showNotification('Investigation completed with no new data', 'info');
+                }
+                break;
+                
+            case 'email':
+                // Run email investigation
+                const emailResponse = await fetch('/api/investigate/email', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email: cleanLabel})
+                });
+                const emailData = await emailResponse.json();
+                if (emailData.status === 'success') {
+                    await refreshGraph();
+                    showNotification(`✅ Email investigation completed for ${cleanLabel}`, 'success');
+                } else {
+                    showNotification('Investigation completed with no new data', 'info');
+                }
+                break;
+                
+            case 'bitcoin':
+                // Run bitcoin investigation
+                const btcAddress = node.data.address || cleanLabel;
+                const btcResponse = await fetch('/api/investigate/bitcoin', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({address: btcAddress})
+                });
+                const btcData = await btcResponse.json();
+                if (btcData.status === 'success') {
+                    await refreshGraph();
+                    showNotification(`✅ Bitcoin investigation completed`, 'success');
+                } else {
+                    showNotification('Investigation completed with no new data', 'info');
+                }
+                break;
+                
+            default:
+                showNotification(`Node type '${node.type}' cannot be expanded further`, 'info');
+        }
+    } catch (error) {
+        showNotification(`❌ Error investigating ${cleanLabel}: ${error.message}`, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Show context menu for node actions
+function showContextMenu(x, y, nodeId, node) {
+    // Remove any existing context menu
+    hideContextMenu();
+    
+    // Remove expand icon from label to get clean value
+    const cleanLabel = node.label.replace(' ⊕', '').trim();
+    
+    // Create context menu
+    const menu = document.createElement('div');
+    menu.id = 'node-context-menu';
+    menu.className = 'context-menu';
+    
+    // Create menu items
+    const investigateBtn = document.createElement('div');
+    investigateBtn.className = 'context-menu-item';
+    investigateBtn.innerHTML = `<span class="menu-icon">🔍</span> Investigate`;
+    investigateBtn.onclick = () => {
+        hideContextMenu();
+        expandNode(nodeId);
+    };
+    
+    const viewDetailsBtn = document.createElement('div');
+    viewDetailsBtn.className = 'context-menu-item';
+    viewDetailsBtn.innerHTML = '<span class="menu-icon">📋</span> Details';
+    viewDetailsBtn.onclick = () => {
+        hideContextMenu();
+        selectNode(nodeId);
+    };
+    
+    // Add menu items
+    menu.appendChild(investigateBtn);
+    menu.appendChild(viewDetailsBtn);
+    
+    // Position menu and check boundaries
+    document.body.appendChild(menu);
+    
+    // Get menu dimensions
+    const menuRect = menu.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Adjust position to keep menu within viewport
+    let finalX = x;
+    let finalY = y;
+    
+    // Check right boundary
+    if (x + menuRect.width > viewportWidth) {
+        finalX = x - menuRect.width - 50; // Show to the left instead
+    }
+    
+    // Check bottom boundary
+    if (y + menuRect.height > viewportHeight) {
+        finalY = y - menuRect.height;
+    }
+    
+    menu.style.left = finalX + 'px';
+    menu.style.top = finalY + 'px';
+    
+    // Close menu when clicking elsewhere
+    setTimeout(() => {
+        document.addEventListener('click', hideContextMenu, { once: true });
+    }, 100);
+}
+
+function hideContextMenu() {
+    const menu = document.getElementById('node-context-menu');
+    if (menu) {
+        menu.remove();
+    }
+}
+
+// Clear graph
+async function clearGraph() {
+    if (confirm('Are you sure you want to clear the entire graph?')) {
+        try {
+            await fetch('/api/graph/clear', {method: 'POST'});
+            nodes.clear();
+            edges.clear();
+            document.getElementById('node-details').innerHTML = '<p class="placeholder">Click on a node to see details</p>';
+            document.getElementById('selected-label').textContent = 'None';
+            updateStats();
+            showNotification('Graph cleared', 'success');
+        } catch (error) {
+            showNotification('Error clearing graph: ' + error.message, 'error');
+        }
+    }
+}
+
+// Export graph
+async function exportGraph() {
+    try {
+        const response = await fetch('/api/export/graph');
+        const data = await response.json();
+        
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `osif-graph-${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showNotification('Graph exported successfully!', 'success');
+    } catch (error) {
+        showNotification('Error exporting graph: ' + error.message, 'error');
+    }
+}
+
+// Fit view
+function fitView() {
+    if (network) {
+        network.fit({animation: true});
+    }
+}
+
+// Update statistics
+function updateStats() {
+    document.getElementById('node-count').textContent = nodes.length;
+    document.getElementById('edge-count').textContent = edges.length;
+}
+
+// Show/hide loading
+function showLoading() {
+    document.getElementById('loading').style.display = 'block';
+}
+
+function hideLoading() {
+    document.getElementById('loading').style.display = 'none';
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+    // Simple console log for now - can be enhanced with toast notifications
+    console.log(`[${type.toUpperCase()}] ${message}`);
+    
+    // You can add a toast library like toastr.js for better notifications
+    if (type === 'error') {
+        alert(`Error: ${message}`);
+    }
+}
+
+// Color utilities
+function darkenColor(color) {
+    // Simple darken by reducing RGB values
+    return color;
+}
+
+function lightenColor(color) {
+    // Simple lighten by increasing RGB values
+    return color;
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== OSIF Graph Starting ===');
+    console.log('DOM Content Loaded');
+    
+    // Check if vis.js is loaded
+    if (typeof vis === 'undefined') {
+        console.error('ERROR: vis.js library not loaded! Check your internet connection.');
+        alert('Error: Graph library not loaded. Please refresh the page.');
+        return;
+    }
+    
+    console.log('vis.js library detected');
+    
+    initNetwork();
+    console.log('OSIF Graph initialized successfully');
+    
+    // Add keyboard shortcuts
+    document.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            const activeElement = document.activeElement;
+            if (activeElement.id === 'domain-input') investigateDomain();
+            else if (activeElement.id === 'ip-input') investigateIP();
+            else if (activeElement.id === 'email-input') investigateEmail();
+            else if (activeElement.id === 'bitcoin-input') investigateBitcoin();
+        }
+    });
+    
+    console.log('Event listeners registered');
+});

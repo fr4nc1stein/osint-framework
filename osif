@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 import re
 import sys
+import os
+import subprocess
+import atexit
+import signal
+import time
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -21,6 +26,133 @@ __script__ = "osif"
 __doc__ = """
 Osif launcher script.
 """
+
+# ============================================================================
+# Web Server Background Process Management
+# ============================================================================
+
+class WebServerManager:
+    """Manages the web server as a background subprocess"""
+    
+    def __init__(self):
+        self.process = None
+        self.port = None
+        self.web_server_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web_server.py')
+        self.python_path = sys.executable
+    
+    def is_port_in_use(self, port):
+        """Check if a port is already in use"""
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(('localhost', port))
+                return False
+            except OSError:
+                return True
+        
+    def start(self, start_port=5001, max_attempts=5):
+        """Start the web server in background, trying incremental ports if needed"""
+        if self.process and self.process.poll() is None:
+            print("⚠️  Web server is already running")
+            return False
+            
+        if not os.path.exists(self.web_server_path):
+            print(f"⚠️  Web server not found at: {self.web_server_path}")
+            return False
+        
+        print("🌐 Starting web server in background...")
+        
+        # Try to find an available port
+        port = start_port
+        for attempt in range(max_attempts):
+            if self.is_port_in_use(port):
+                if attempt == 0:
+                    print(f"⚠️  Port {port} is already in use, trying next port...")
+                else:
+                    print(f"⚠️  Port {port} is also in use, trying {port + 1}...")
+                port += 1
+                continue
+            
+            # Found available port, try to start server
+            try:
+                self.process = subprocess.Popen(
+                    [self.python_path, self.web_server_path, '--port', str(port)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    stdin=subprocess.DEVNULL,
+                    cwd=os.path.dirname(self.web_server_path),
+                    start_new_session=True,
+                    text=True
+                )
+                
+                # Wait a moment to ensure it started
+                time.sleep(2)
+                
+                if self.process.poll() is None:
+                    self.port = port
+                    print(f"✅ Web server started (PID: {self.process.pid})")
+                    print(f"🔗 Access at: http://localhost:{port}")
+                    return True
+                else:
+                    # Process died, check stderr for error
+                    _, stderr = self.process.communicate(timeout=1)
+                    if stderr:
+                        print(f"❌ Web server failed on port {port}: {stderr.strip()[:100]}")
+                    port += 1
+                    continue
+                    
+            except Exception as e:
+                print(f"❌ Error starting web server on port {port}: {e}")
+                port += 1
+                continue
+        
+        print(f"❌ Failed to start web server after trying ports {start_port}-{port-1}")
+        return False
+    
+    def stop(self):
+        """Stop the web server subprocess"""
+        if self.process and self.process.poll() is None:
+            print("\n🛑 Stopping web server...")
+            try:
+                # Send SIGTERM for graceful shutdown
+                self.process.terminate()
+                try:
+                    self.process.wait(timeout=5)
+                    print("✅ Web server stopped")
+                except subprocess.TimeoutExpired:
+                    print("⚠️  Force killing web server...")
+                    self.process.kill()
+                    self.process.wait()
+            except Exception as e:
+                print(f"❌ Error stopping web server: {e}")
+        self.process = None
+    
+    def is_running(self):
+        """Check if web server is running"""
+        return self.process and self.process.poll() is None
+
+# Global web server manager
+web_server = WebServerManager()
+
+def cleanup_web_server():
+    """Cleanup function called on exit"""
+    web_server.stop()
+
+atexit.register(cleanup_web_server)
+
+def handle_signal(sig, frame):
+    """Handle interrupt signals"""
+    print("\n🛑 Shutting down...")
+    web_server.stop()
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, handle_signal)
+signal.signal(signal.SIGTERM, handle_signal)
+
+# ============================================================================
+# Environment and Main Function
+# ============================================================================
+
 def initialize_env():
     env_path = os.path.join(os.path.dirname(__file__), ".env")
     if not os.path.exists(env_path):
@@ -45,13 +177,15 @@ def initialize_env():
         print(".env file already exists. Skipping setup.")
 
 def main():
-    import argparse
-    parser = argparse.ArgumentParser(description="OSIF launcher script")
-    parser.add_argument("-d", "--dev", action="store_true", help="enable development mode")
-    parser.add_argument("-v", "--verbose", action="store_true", help="enable verbose debug mode")
-    args = parser.parse_args()
-
+    # Initialize tinyscript first
     initialize(exit_at_interrupt=False)
+    
+    # Parse custom arguments
+    import argparse
+    parser = argparse.ArgumentParser(description="OSIF launcher script", add_help=False)
+    parser.add_argument("-d", "--dev", action="store_true", help="enable development mode")
+    parser.add_argument("--no-web", action="store_true", help="disable web server background process")
+    args, unknown = parser.parse_known_args()
 
     # Add traceback
     sys.tracebacklimit = 0
@@ -59,13 +193,22 @@ def main():
     # Disable .pyc files
     sys.dont_write_bytecode = True
 
+    # Start web server in background (unless disabled)
+    if not args.no_web:
+        web_server.start()
+        print("=" * 60)
+
     c = OsifConsole(
         "OSIF",
         banner_section_styles={'title': {'fgcolor': "lolcat"}},
         dev=args.dev,
-        debug=args.verbose,
     )
-    c.start()
+    
+    try:
+        c.start()
+    finally:
+        # Ensure cleanup on exit
+        web_server.stop()
 
 if __name__ == '__main__':
     initialize_env()
