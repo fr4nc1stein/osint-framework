@@ -4,4 +4,8 @@ lib/*
 pyvenv.cfg
 share/*
 modules/*/*
+
+# Environment files with secrets
 .env
+.env.local
+.env.*.local
