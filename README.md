@@ -30,6 +30,8 @@ Traditional Metasploit-style CLI for running OSINT modules
 - **Automatic Entity Linking**: Automatically discovers and links related entities
 - **Export Capabilities**: Export investigation graphs as JSON
 - **Real-time Updates**: Watch your investigation graph grow in real-time
+- **Smart Port Management**: Automatic port conflict detection and increment (5001-5005)
+- **IP Reputation**: Integrated AbuseIPDB for threat intelligence and abuse scoring
 
 # Screenshots
 
@@ -63,6 +65,15 @@ The new web interface provides a visual, interactive way to conduct OSINT invest
 # Documentation
 
 Full documentation found at https://osif.laet4x.com/
+
+## 📚 Developer Documentation
+
+For developers and AI coding agents working on OSIF:
+
+- **[Architecture Guide](.agent/architecture.md)** - Complete system architecture and technical design
+- **[Feature Planning](.agent/feature-planning.md)** - Roadmap, priorities, and feature backlog
+- **[Development Guide](.agent/development-guide.md)** - Coding standards, workflows, and best practices
+- **[Agent README](.agent/README.md)** - Overview of developer documentation
 
 # Docker Installation (Recommended)
 
