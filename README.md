@@ -1,11 +1,29 @@
-# OSIF
+<div align="center">
+
+# 🔍 OSIF - Open Source Intelligence Framework
 
 [![Read The Docs](https://readthedocs.org/projects/osint-framework/badge/?version=latest)](https://osif.laet4x.com/)
-[![License](https://img.shields.io/badge/license-AGPL%20v3-lightgrey.svg)](https://github.com/fr4nc1stein/osint-framework/blob/main/LICENSE.md)
+[![License](https://img.shields.io/badge/license-AGPL%20v3-blue.svg)](https://github.com/fr4nc1stein/osint-framework/blob/main/LICENSE.md)
+[![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-Opensource Intelligence Framework is an open-source framework dedicated to OSINT. For the ease of use, the interface has a layout that looks like Metasploit.
+**A powerful OSINT framework with dual interfaces: Metasploit-style CLI and Maltego-style web visualization**
 
-**🆕 NEW: Web-based Graph Visualization** - Now includes a Maltego-style web interface for visual OSINT investigations!
+[Features](#features) • [Installation](#installation) • [Usage](#usage) • [Documentation](#documentation) • [Contributing](CONTRIBUTING.md)
+
+</div>
+
+---
+
+## 🎯 Overview
+
+OSIF (Open Source Intelligence Framework) is a comprehensive OSINT platform that combines the power of command-line efficiency with modern web-based graph visualization. Designed for security researchers, penetration testers, and OSINT investigators.
+
+### ✨ What's New
+
+**� Web-based Graph Visualization** - Now includes a Maltego-style web interface for visual OSINT investigations with real-time entity linking and relationship mapping!
+
+### 📦 Module Categories
 
 It consists of various modules that aid osint operations:
 
