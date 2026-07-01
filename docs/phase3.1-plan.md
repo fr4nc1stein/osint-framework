@@ -727,3 +727,55 @@ Case Detail (/cases/:id):
 When a node's value contains a recognisable URL, the generic link icon is replaced with the platform's icon:
 
 `github.com` → GitHub · `linkedin.com` → LinkedIn · `twitter.com` / `x.com` → X/Twitter · `reddit.com` → Reddit · `instagram.com` → Instagram · `facebook.com` → Facebook · `t.me` / `telegram` → Telegram · `youtube.com` → YouTube · `twitch.tv` → Twitch · `discord` → Discord · `steamcommunity` / `steampowered` → Steam · *(everything else)* → Globe
+
+---
+
+## 🔧 Fix Pass — Cases Graph Tab & UI Consistency
+
+**Date:** 2026-07-01  
+**Trigger:** Cases → Graph tab was rendering the old inline Cytoscape graph (plain circles, no sidebar, no node panel) instead of the new graph UI built for ScanView.
+
+---
+
+### Problems Fixed
+
+| Problem | Root Cause | Fix |
+|---------|-----------|-----|
+| Cases → Graph tab showed old plain-circle graph | `CaseDetail.vue` had its own inline Cytoscape init copied from the old `ScanView` — never updated when the new graph components were built | Removed all inline Cytoscape code; wired in `GraphSidebar`, `GraphVisualization`, `GraphNodePanel` |
+| Graph tab was trapped inside `overflow-y-auto p-6` container | Outer `<div>` forced all tabs to scroll; graph needs full-height flex | Restructured `CaseDetail.vue` to `flex flex-col h-full overflow-hidden`; graph tab gets `flex-1 flex overflow-hidden` (3-column), all other tabs get `flex-1 overflow-y-auto p-6` |
+| Case graph had no seed/parent concept in sidebar | Case graph merges all scans — no single seed value | Passed `currentCase.title` as `seedValue` and `'case'` as `seedKind` to `GraphSidebar`; case title renders pinned at top of sidebar |
+| Graph loaded eagerly on mount even when not on graph tab | `loadGraph()` called inside `onMounted` | Changed to lazy load — `fetchCaseGraph` only fires when the graph tab is first clicked via `switchTab()` |
+| "Scan from node" in case graph had no parent scan context | Case graph merges multiple scans, no single parent | Pre-fills `caseId` + node `value`/`kind`; skips `parentScanId` (appropriate — scan would be a new root scan under the case) |
+| Adding a new scan didn't refresh the case graph | `@created` handler only called `fetchCaseScans` | Handler now also calls `fetchCaseGraph` so the graph updates immediately |
+
+---
+
+### Modified Files
+
+| File | Change |
+|------|--------|
+| `frontend/src/views/CaseDetail.vue` | Full restructure: removed 80 lines of inline Cytoscape; graph tab → 3-column `GraphSidebar \| GraphVisualization \| GraphNodePanel`; outer layout changed to `flex-col h-full overflow-hidden`; lazy graph load on tab switch; two `CreateScanModal` instances (add scan + scan-from-node); all other tabs preserved unchanged |
+
+---
+
+### Layout Architecture (CaseDetail — final)
+
+```
+CaseDetail.vue
+├── Case header (always visible, shrink-0)
+│   ├── Breadcrumb → /cases
+│   ├── Title, status badge, priority badge, tags
+│   ├── "Add Scan" button
+│   └── Tab bar (Scans / Graph / Timeline / Notes / Reports)
+│
+├── [Graph tab] flex-1 flex overflow-hidden
+│   ├── GraphSidebar        — 288px, case title pinned, indicators grouped
+│   ├── GraphVisualization  — flex-1, full node icons + colors + controls
+│   └── GraphNodePanel      — 288px slide-in, connections + scan-from-node
+│
+└── [All other tabs] flex-1 overflow-y-auto p-6
+    ├── Scans    — hierarchy tree, parent/child indented
+    ├── Timeline — chronological events derived from scans/reports/notes
+    ├── Notes    — add/delete investigation notes
+    └── Reports  — generate/download/delete case reports
+```
