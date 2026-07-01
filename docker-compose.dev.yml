@@ -78,10 +78,6 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-volumes:
-  postgres_data:
-  redis_data:
-
   frontend:
     build:
       context: ./frontend
@@ -91,5 +87,7 @@ volumes:
       - "3000:80"
     depends_on:
       - backend
-    networks:
-      - default
+
+volumes:
+  postgres_data:
+  redis_data:

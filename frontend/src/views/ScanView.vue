@@ -185,7 +185,9 @@ const loadGraphData = async () => {
 };
 
 const connectWebSocket = () => {
-  const wsUrl = `ws://localhost:6000/ws/scan/${route.params.id}`;
+  // Use relative WebSocket URL so it goes through Nginx proxy
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/ws/scan/${route.params.id}`;
   ws.value = new WebSocket(wsUrl);
 
   ws.value.onmessage = (event) => {
