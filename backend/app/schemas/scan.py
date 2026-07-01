@@ -1,6 +1,6 @@
 """Scan Pydantic Schemas"""
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 import uuid
 
@@ -10,7 +10,7 @@ class ScanCreate(BaseModel):
     case_id: Optional[uuid.UUID] = None
     parent_scan_id: Optional[uuid.UUID] = None
     seed_value: str = Field(..., min_length=1)
-    seed_kind: str = Field(..., pattern="^(domain|ip|email|phone|username|bitcoin)$")
+    seed_kind: str = Field(..., pattern="^(domain|ip|email|url|phone|username|bitcoin)$")
     modules: List[str] = Field(..., min_items=1)
 
 
@@ -26,6 +26,7 @@ class ScanResponse(BaseModel):
     progress: int
     total_modules: int
     error_message: Optional[str] = None
+    module_statuses: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     created_at: datetime
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None

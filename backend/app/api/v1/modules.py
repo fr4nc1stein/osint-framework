@@ -2,19 +2,10 @@
 from typing import List
 from fastapi import APIRouter, HTTPException, status
 
-from app.modules.registry import get_all_modules, get_module, PLUGIN_REGISTRY, discover_modules
+from app.modules.registry import get_all_modules, get_module
 from app.schemas.module import ModuleInfo
 
 router = APIRouter()
-
-NODE_MODULE_MAP = {
-    "ip":       ["ip_geolocation", "abuseipdb", "shodan_lookup"],
-    "domain":   ["dns_records", "whois_lookup", "subdomain_enum", "virustotal_domain", "urlscan_lookup"],
-    "email":    ["hibp_breach", "email_domain"],
-    "username": ["hibp_breach"],
-    "phone":    [],
-    "bitcoin":  [],
-}
 
 
 @router.get("", response_model=List[ModuleInfo])
@@ -27,21 +18,31 @@ async def list_modules(category: str | None = None):
 
 
 @router.get("/suggest")
-async def suggest_modules(node_type: str = "domain"):
+async def suggest_modules(node_type: str = "domain", configured_only: bool = False):
     """Return applicable modules for a given node type (must be before /{module_id})"""
-    if not PLUGIN_REGISTRY:
-        discover_modules()
-    result = []
-    for mod_id in NODE_MODULE_MAP.get(node_type.lower(), []):
-        cls = PLUGIN_REGISTRY.get(mod_id)
-        if cls:
-            result.append({
-                "module_id": cls.MODULE_ID,
-                "name": cls.DISPLAY_NAME,
-                "description": cls.DESCRIPTION,
-                "requires_api_key": cls.REQUIRES_API_KEY,
-            })
-    return result
+    normalized_type = node_type.lower()
+    modules = [
+        module
+        for module in get_all_modules()
+        if normalized_type in [accepted.lower() for accepted in module.accepts]
+    ]
+
+    if configured_only:
+        modules = [module for module in modules if module.api_key_configured]
+
+    return [
+        {
+            "module_id": module.module_id,
+            "name": module.display_name,
+            "display_name": module.display_name,
+            "description": module.description,
+            "category": module.category,
+            "accepts": module.accepts,
+            "requires_api_key": module.requires_api_key,
+            "api_key_configured": module.api_key_configured,
+        }
+        for module in modules
+    ]
 
 
 @router.get("/{module_id}", response_model=ModuleInfo)

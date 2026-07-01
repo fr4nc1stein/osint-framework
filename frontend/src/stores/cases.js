@@ -5,10 +5,15 @@ export const useCasesStore = defineStore('cases', {
   state: () => ({
     cases: [],
     currentCase: null,
+    currentCaseId: null,
     caseScans: [],
+    caseScansCaseId: null,
     caseGraph: null,
+    caseGraphCaseId: null,
     caseNotes: [],
+    caseNotesCaseId: null,
     caseReports: [],
+    caseReportsCaseId: null,
     loading: false,
     error: null,
   }),
@@ -31,8 +36,20 @@ export const useCasesStore = defineStore('cases', {
       this.loading = true
       this.error = null
       try {
+        if (this.currentCaseId !== id) {
+          this.currentCase = null
+          this.caseScans = []
+          this.caseScansCaseId = null
+          this.caseGraph = null
+          this.caseGraphCaseId = null
+          this.caseNotes = []
+          this.caseNotesCaseId = null
+          this.caseReports = []
+          this.caseReportsCaseId = null
+        }
         const { data } = await api.getCase(id)
         this.currentCase = data
+        this.currentCaseId = id
       } catch (e) {
         this.error = e.response?.data?.detail || e.message
       } finally {
@@ -62,18 +79,21 @@ export const useCasesStore = defineStore('cases', {
     async fetchCaseScans(caseId) {
       const { data } = await api.getCaseScans(caseId)
       this.caseScans = data
+      this.caseScansCaseId = caseId
       return data
     },
 
     async fetchCaseGraph(caseId) {
       const { data } = await api.getCaseGraph(caseId)
       this.caseGraph = data
+      this.caseGraphCaseId = caseId
       return data
     },
 
     async fetchCaseNotes(caseId) {
       const { data } = await api.getCaseNotes(caseId)
       this.caseNotes = data
+      this.caseNotesCaseId = caseId
       return data
     },
 
@@ -91,6 +111,7 @@ export const useCasesStore = defineStore('cases', {
     async fetchCaseReports(caseId) {
       const { data } = await api.getCaseReports(caseId)
       this.caseReports = data
+      this.caseReportsCaseId = caseId
       return data
     },
 

@@ -2,6 +2,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.core.queue import close_queue
@@ -88,7 +89,7 @@ def create_app() -> FastAPI:
         try:
             # Check database
             async for db in get_db():
-                await db.execute("SELECT 1")
+                await db.execute(text("SELECT 1"))
             
             # Check Redis
             redis = await get_redis()

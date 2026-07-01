@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional
 from arq import ArqRedis
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy import select, update
 
 from app.core.config import settings
 from app.modules.registry import get_module_class
@@ -14,7 +15,7 @@ from app.services.auto_linker import AutoLinkerService
 
 
 async def get_db_session() -> AsyncSession:
-    """Create database session for worker"""
+    """Create database session for ad hoc task execution outside arq worker."""
     engine = create_async_engine(
         settings.DATABASE_URL,
         echo=False,
@@ -35,6 +36,134 @@ async def publish_event(redis: ArqRedis, scan_id: str, event: dict):
         {"data": event_data},
         maxlen=1000  # Keep last 1000 events
     )
+
+
+def _module_error_status(error: Exception) -> str:
+    """Classify module failures without expanding the public event contract."""
+    if "rate limit" in str(error).lower():
+        return "rate_limited"
+    return "failed"
+
+
+async def update_module_status(
+    db: AsyncSession,
+    scan_id: str,
+    module_id: str,
+    status: str,
+    **extra
+):
+    """Update one module entry under a row lock to avoid progress races."""
+    from app.models.scan import Scan
+
+    result = await db.execute(
+        select(Scan).where(Scan.id == scan_id).with_for_update()
+    )
+    scan = result.scalar_one_or_none()
+    if not scan:
+        return None
+
+    module_statuses = dict(scan.module_statuses or {})
+    module_state = dict(module_statuses.get(module_id, {}))
+    module_state.update({
+        "status": status,
+        "updated_at": datetime.utcnow().isoformat(),
+        **extra
+    })
+    module_statuses[module_id] = module_state
+
+    terminal_statuses = {"completed", "failed", "skipped", "rate_limited"}
+    terminal_modules = [
+        state for state in module_statuses.values()
+        if state.get("status") in terminal_statuses
+    ]
+    failed_modules = [
+        state for state in module_statuses.values()
+        if state.get("status") in {"failed", "rate_limited"}
+    ]
+    completed_modules = [
+        state for state in module_statuses.values()
+        if state.get("status") == "completed"
+    ]
+
+    values = {
+        "module_statuses": module_statuses,
+        "progress": min(len(terminal_modules), scan.total_modules),
+    }
+
+    finalized = False
+    if scan.total_modules and len(terminal_modules) >= scan.total_modules:
+        finalized = True
+        values["finished_at"] = datetime.utcnow()
+        if completed_modules and failed_modules:
+            values["status"] = "partial"
+            values["error_message"] = f"{len(failed_modules)} module(s) failed"
+        elif completed_modules:
+            values["status"] = "completed"
+            values["error_message"] = None
+        else:
+            values["status"] = "failed"
+            values["error_message"] = "All modules failed"
+
+    await db.execute(
+        update(Scan)
+        .where(Scan.id == scan_id)
+        .values(**values)
+    )
+    await db.commit()
+
+    total_edges_created = sum(
+        int(state.get("edges_created") or 0)
+        for state in module_statuses.values()
+    )
+
+    return {
+        "finalized": finalized,
+        "scan_status": values.get("status", scan.status),
+        "module_statuses": module_statuses,
+        "completed_modules": len(completed_modules),
+        "failed_modules": len(failed_modules),
+        "total_edges_created": total_edges_created,
+    }
+
+
+async def finalize_scan_side_effects(
+    db: AsyncSession,
+    redis: ArqRedis,
+    scan_id: str,
+    final_state: dict,
+):
+    """Run scan-level completion work after the last module attempt finishes."""
+    if final_state["completed_modules"] > 0:
+        try:
+            auto_linker = AutoLinkerService(db)
+
+            # Find corroborations
+            corr_edges = await auto_linker.find_corroborations(scan_id)
+
+            # Infer relationships
+            inferred_edges = await auto_linker.infer_relationships(scan_id)
+
+            # Get stats
+            stats = await auto_linker.get_correlation_stats(scan_id)
+
+            # Publish auto-linker event
+            await publish_event(redis, scan_id, {
+                "type": "auto_linker_complete",
+                "corroborations": len(corr_edges),
+                "inferred": len(inferred_edges),
+                "stats": stats,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        except Exception as e:
+            print(f"Auto-linker error: {e}")
+
+    # Publish completion event
+    await publish_event(redis, scan_id, {
+        "type": "scan_complete",
+        "status": final_state["scan_status"],
+        "total_discoveries": final_state["total_edges_created"],
+        "timestamp": datetime.utcnow().isoformat()
+    })
 
 
 async def run_scan_task(
@@ -63,7 +192,18 @@ async def run_scan_task(
     
     try:
         # Get database session
-        db = await get_db_session()
+        if 'db_sessionmaker' in ctx:
+            db = ctx['db_sessionmaker']()
+        else:
+            db = await get_db_session()
+
+        await update_module_status(
+            db,
+            scan_id,
+            module_id,
+            "running",
+            started_at=datetime.utcnow().isoformat()
+        )
         
         # Publish start event
         await publish_event(redis, scan_id, {
@@ -139,66 +279,23 @@ async def run_scan_task(
                 print(f"Error processing discovery: {e}")
                 continue
         
-        # Update scan progress
-        from app.models.scan import Scan
-        from sqlalchemy import select, update
-        
-        result = await db.execute(select(Scan).where(Scan.id == scan_id))
-        scan = result.scalar_one_or_none()
-        
-        if scan:
-            # Increment progress
-            new_progress = scan.progress + 1
-            await db.execute(
-                update(Scan)
-                .where(Scan.id == scan_id)
-                .values(progress=new_progress)
+        final_state = await update_module_status(
+            db,
+            scan_id,
+            module_id,
+            "completed",
+            discoveries_count=len(discoveries),
+            edges_created=len(edges_created),
+            finished_at=datetime.utcnow().isoformat()
+        )
+
+        if final_state and final_state["finalized"]:
+            await finalize_scan_side_effects(
+                db,
+                redis,
+                scan_id,
+                final_state
             )
-            await db.commit()
-            
-            # Check if scan is complete
-            if new_progress >= scan.total_modules:
-                # Run auto-linker for cross-correlation
-                try:
-                    auto_linker = AutoLinkerService(db)
-                    
-                    # Find corroborations
-                    corr_edges = await auto_linker.find_corroborations(scan_id)
-                    
-                    # Infer relationships
-                    inferred_edges = await auto_linker.infer_relationships(scan_id)
-                    
-                    # Get stats
-                    stats = await auto_linker.get_correlation_stats(scan_id)
-                    
-                    # Publish auto-linker event
-                    await publish_event(redis, scan_id, {
-                        "type": "auto_linker_complete",
-                        "corroborations": len(corr_edges),
-                        "inferred": len(inferred_edges),
-                        "stats": stats,
-                        "timestamp": datetime.utcnow().isoformat()
-                    })
-                except Exception as e:
-                    print(f"Auto-linker error: {e}")
-                
-                # Mark scan as completed
-                await db.execute(
-                    update(Scan)
-                    .where(Scan.id == scan_id)
-                    .values(
-                        status="completed",
-                        finished_at=datetime.utcnow()
-                    )
-                )
-                await db.commit()
-                
-                # Publish completion event
-                await publish_event(redis, scan_id, {
-                    "type": "scan_complete",
-                    "total_discoveries": len(edges_created),
-                    "timestamp": datetime.utcnow().isoformat()
-                })
         
         # Publish module completion
         await publish_event(redis, scan_id, {
@@ -225,23 +322,33 @@ async def run_scan_task(
             "timestamp": datetime.utcnow().isoformat()
         })
         
-        # Update scan with error
+        # Record the module failure, but leave the scan running while other
+        # module jobs can still complete successfully.
+        final_state = None
         if db:
-            from app.models.scan import Scan
-            from sqlalchemy import update
-            
-            await db.execute(
-                update(Scan)
-                .where(Scan.id == scan_id)
-                .values(
-                    status="error",
-                    error_message=str(e),
-                    finished_at=datetime.utcnow()
-                )
+            await db.rollback()
+            final_state = await update_module_status(
+                db,
+                scan_id,
+                module_id,
+                _module_error_status(e),
+                error=str(e),
+                finished_at=datetime.utcnow().isoformat()
             )
-            await db.commit()
-        
-        raise
+
+        if final_state and final_state["finalized"]:
+            await finalize_scan_side_effects(
+                db,
+                redis,
+                scan_id,
+                final_state
+            )
+
+        return {
+            "status": "failed",
+            "module_id": module_id,
+            "error": str(e)
+        }
         
     finally:
         if db:

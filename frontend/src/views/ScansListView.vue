@@ -22,11 +22,13 @@ const statusBadge = {
   queued:    'badge-slate',
   running:   'badge-blue',
   completed: 'badge-green',
+  partial:   'badge-amber',
+  failed:    'badge-red',
   error:     'badge-red',
 }
 
 const statusIcon = {
-  queued: '⏳', running: '🔄', completed: '✅', error: '❌',
+  queued: '⏳', running: '🔄', completed: '✅', partial: '⚠️', failed: '❌', error: '❌',
 }
 
 function fmtDate(d) {
@@ -57,7 +59,7 @@ function fmtDate(d) {
     <!-- Filter bar -->
     <div class="flex gap-2 mb-6">
       <button
-        v-for="f in ['all','queued','running','completed','error']" :key="f"
+        v-for="f in ['all','queued','running','completed','partial','failed','error']" :key="f"
         class="px-3 py-1.5 rounded-md text-sm font-medium transition-all"
         :style="filterStatus === f
           ? 'background-color: var(--accent); color: #fff'

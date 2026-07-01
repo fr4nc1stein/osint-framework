@@ -82,6 +82,7 @@ onMounted(() => {
               <option value="domain">Domain</option>
               <option value="ip">IP Address</option>
               <option value="email">Email</option>
+              <option value="url">URL</option>
               <option value="username">Username</option>
             </select>
           </div>

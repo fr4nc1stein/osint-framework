@@ -1,17 +1,18 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCasesStore } from '../stores/cases'
 import GraphVisualization from '../components/GraphVisualization.vue'
 import GraphSidebar from '../components/GraphSidebar.vue'
 import GraphNodePanel from '../components/GraphNodePanel.vue'
 import CreateScanModal from '../components/CreateScanModal.vue'
+import { api } from '../api/client'
 
 const route = useRoute()
 const router = useRouter()
 const casesStore = useCasesStore()
 
-const caseId    = route.params.id
+const caseId    = computed(() => route.params.id)
 const activeTab = ref('scans')
 const tabs      = ['scans', 'graph', 'timeline', 'notes', 'reports']
 
@@ -22,19 +23,42 @@ const reportForm     = ref({ title: '', report_type: 'summary', report_format: '
 const selectedNode   = ref(null)
 const scanFromNode   = ref(null)
 const showNodeScan   = ref(false)
+const nodeSuggestedModules = ref([])
 
 onMounted(async () => {
-  await casesStore.fetchCase(caseId)
-  await casesStore.fetchCaseScans(caseId)
-  await casesStore.fetchCaseNotes(caseId)
-  await casesStore.fetchCaseReports(caseId)
+  await loadCase(caseId.value)
 })
+
+watch(
+  () => route.params.id,
+  async (nextCaseId, previousCaseId) => {
+    if (nextCaseId && nextCaseId !== previousCaseId) {
+      activeTab.value = 'scans'
+      selectedNode.value = null
+      scanFromNode.value = null
+      showNodeScan.value = false
+      await loadCase(nextCaseId)
+    }
+  }
+)
+
+async function loadCase(id) {
+  await casesStore.fetchCase(id)
+  await casesStore.fetchCaseScans(id)
+  await casesStore.fetchCaseNotes(id)
+  await casesStore.fetchCaseReports(id)
+}
+
+function currentCaseId() {
+  return caseId.value
+}
 
 const currentCase = computed(() => casesStore.currentCase)
 const scans       = computed(() => casesStore.caseScans)
 const notes       = computed(() => casesStore.caseNotes)
 const reports     = computed(() => casesStore.caseReports)
 const caseGraph   = computed(() => casesStore.caseGraph)
+const nodeParentScanId = computed(() => resolveNodeParentScanId(scanFromNode.value))
 
 // Normalise case graph: the API returns scan_origins on nodes/edges,
 // but GraphVisualization expects source/target not scan_origins on edges.
@@ -47,7 +71,14 @@ const timeline = computed(() => {
   }
   for (const s of scans.value) {
     events.push({ time: s.created_at, type: 'scan', label: 'Scan started', detail: `${s.seed_value} (${s.seed_kind})` })
-    if (s.finished_at) events.push({ time: s.finished_at, type: 'scan_done', label: 'Scan completed', detail: s.seed_value })
+    if (s.finished_at) {
+      const label = s.status === 'partial'
+        ? 'Scan partially completed'
+        : s.status === 'failed'
+          ? 'Scan failed'
+          : 'Scan completed'
+      events.push({ time: s.finished_at, type: s.status === 'failed' ? 'scan_failed' : 'scan_done', label, detail: s.seed_value })
+    }
   }
   for (const r of reports.value) {
     events.push({ time: r.generated_at, type: 'report', label: 'Report generated', detail: r.title })
@@ -65,38 +96,47 @@ function fmtDate(d) {
   return new Date(d).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 function statusIcon(s) {
-  return { queued: '⏳', running: '🔄', completed: '✅', error: '❌' }[s] || '•'
+  return { queued: '⏳', running: '🔄', completed: '✅', partial: '⚠️', failed: '❌', error: '❌' }[s] || '•'
 }
 function rootScans(all) { return all.filter(s => !s.parent_scan_id) }
 function childScans(all, pid) { return all.filter(s => s.parent_scan_id === pid) }
 
 async function switchTab(tab) {
   activeTab.value = tab
-  if (tab === 'graph' && !caseGraph.value) {
-    await casesStore.fetchCaseGraph(caseId)
+  if (tab === 'graph' && casesStore.caseGraphCaseId !== currentCaseId()) {
+    await casesStore.fetchCaseGraph(currentCaseId())
   }
 }
 
 async function addNote() {
   if (!newNote.value.trim()) return
-  await casesStore.createNote(caseId, { content: newNote.value })
+  await casesStore.createNote(currentCaseId(), { content: newNote.value })
   newNote.value = ''
 }
 
 async function submitReport() {
-  await casesStore.createReport(caseId, reportForm.value)
+  await casesStore.createReport(currentCaseId(), reportForm.value)
   showReportModal.value = false
   reportForm.value = { title: '', report_type: 'summary', report_format: 'markdown' }
 }
 
-function deleteNote(id)   { casesStore.deleteNote(caseId, id) }
+function deleteNote(id)   { casesStore.deleteNote(currentCaseId(), id) }
 function deleteReport(id) { casesStore.deleteReport(id) }
 
+function reportDownloadMeta(r) {
+  const isText = r.report_format === 'text'
+  return {
+    extension: isText ? 'txt' : 'md',
+    mime: isText ? 'text/plain;charset=utf-8' : 'text/markdown;charset=utf-8',
+  }
+}
+
 function downloadReport(r) {
-  const blob = new Blob([r.content || ''], { type: 'text/markdown' })
+  const meta = reportDownloadMeta(r)
+  const blob = new Blob([r.content || ''], { type: meta.mime })
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
-  a.href = url; a.download = `${r.title.replace(/\s+/g, '_')}.md`; a.click()
+  a.href = url; a.download = `${r.title.replace(/\s+/g, '_')}.${meta.extension}`; a.click()
   URL.revokeObjectURL(url)
 }
 
@@ -104,8 +144,51 @@ function onNodeSelect(node) {
   selectedNode.value = node
 }
 
-function openScanFromNode(node) {
+function unique(values) {
+  return [...new Set(values.filter(Boolean))]
+}
+
+function resolveOriginScanId(origin, availableScans) {
+  if (!origin) return null
+  if (typeof origin === 'object') return origin.id || origin.scan_id || null
+  if (availableScans.some(s => s.id === origin)) return origin
+  return null
+}
+
+function resolveNodeParentScanId(node) {
+  if (!node) return null
+
+  const availableScans = caseGraph.value?.scans?.length ? caseGraph.value.scans : scans.value
+  const origins = Array.isArray(node.scan_origins) ? node.scan_origins : []
+
+  const explicitIds = unique(origins.map(origin => resolveOriginScanId(origin, availableScans)))
+  if (explicitIds.length === 1) return explicitIds[0]
+
+  const originLabels = origins.filter(origin => typeof origin === 'string')
+  const matchedIds = unique(
+    availableScans
+      .filter(scan => originLabels.includes(scan.seed_value))
+      .map(scan => scan.id)
+  )
+  if (matchedIds.length === 1) return matchedIds[0]
+
+  const seedMatchIds = unique(
+    availableScans
+      .filter(scan => scan.seed_value === node.value)
+      .map(scan => scan.id)
+  )
+  return seedMatchIds.length === 1 ? seedMatchIds[0] : null
+}
+
+async function openScanFromNode(node) {
   scanFromNode.value = node
+  nodeSuggestedModules.value = []
+  try {
+    const { data } = await api.suggestModules(node.kind)
+    nodeSuggestedModules.value = data.map(module => module.module_id)
+  } catch {
+    nodeSuggestedModules.value = []
+  }
   showNodeScan.value = true
 }
 </script>
@@ -253,11 +336,12 @@ function openScanFromNode(node) {
                 :class="{
                   'bg-blue-500/20 text-blue-300':    ev.type === 'case',
                   'bg-emerald-500/20 text-emerald-300': ev.type === 'scan_done',
+                  'bg-red-500/20 text-red-300':      ev.type === 'scan_failed',
                   'bg-amber-500/20 text-amber-300':  ev.type === 'scan',
                   'bg-purple-500/20 text-purple-300':ev.type === 'report',
                   'bg-slate-500/20 text-slate-300':  ev.type === 'note',
                 }">
-                {{ { case: '📁', scan: '🔍', scan_done: '✅', report: '📄', note: '📝' }[ev.type] || '•' }}
+                {{ { case: '📁', scan: '🔍', scan_done: '✅', scan_failed: '❌', report: '📄', note: '📝' }[ev.type] || '•' }}
               </div>
               <div v-if="i < timeline.length - 1" class="w-0.5 flex-1 my-1" style="background-color: var(--border)"></div>
             </div>
@@ -332,8 +416,10 @@ function openScanFromNode(node) {
     :default-case-id="caseId"
     :default-target="scanFromNode.value"
     :default-kind="scanFromNode.kind"
-    @close="showNodeScan = false; scanFromNode = null"
-    @created="() => { showNodeScan = false; scanFromNode = null; casesStore.fetchCaseGraph(caseId) }"
+    :parent-scan-id="nodeParentScanId"
+    :suggested-modules="nodeSuggestedModules"
+    @close="showNodeScan = false; scanFromNode = null; nodeSuggestedModules = []"
+    @created="() => { showNodeScan = false; scanFromNode = null; nodeSuggestedModules = []; casesStore.fetchCaseGraph(caseId) }"
   />
 
   <!-- Report modal -->

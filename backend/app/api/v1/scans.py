@@ -23,6 +23,10 @@ async def create_scan(
     scan = Scan(
         **scan_data.model_dump(),
         total_modules=len(scan_data.modules),
+        module_statuses={
+            module_id: {"status": "queued"}
+            for module_id in scan_data.modules
+        },
         status="queued"
     )
     

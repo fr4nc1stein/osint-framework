@@ -31,7 +31,12 @@ const tabs = [
 ]
 
 const statusBadge = {
-  queued: 'badge-slate', running: 'badge-blue', completed: 'badge-green', error: 'badge-red',
+  queued: 'badge-slate',
+  running: 'badge-blue',
+  completed: 'badge-green',
+  partial: 'badge-amber',
+  failed: 'badge-red',
+  error: 'badge-red',
 }
 
 function fmtTime(ts) { return new Date(ts).toLocaleTimeString() }

@@ -19,12 +19,21 @@ function fmtDate(d) {
   return new Date(d).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+function reportDownloadMeta(r) {
+  const isText = r.report_format === 'text'
+  return {
+    extension: isText ? 'txt' : 'md',
+    mime: isText ? 'text/plain;charset=utf-8' : 'text/markdown;charset=utf-8',
+  }
+}
+
 function download(r) {
-  const blob = new Blob([r.content || ''], { type: 'text/markdown' })
+  const meta = reportDownloadMeta(r)
+  const blob = new Blob([r.content || ''], { type: meta.mime })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${r.title.replace(/\s+/g, '_')}.md`
+  a.download = `${r.title.replace(/\s+/g, '_')}.${meta.extension}`
   a.click()
   URL.revokeObjectURL(url)
 }

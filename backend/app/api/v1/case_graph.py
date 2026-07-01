@@ -125,6 +125,7 @@ async def list_case_scans(
             "status": s.status,
             "progress": s.progress,
             "total_modules": s.total_modules,
+            "module_statuses": s.module_statuses,
             "created_at": s.created_at.isoformat(),
             "finished_at": s.finished_at.isoformat() if s.finished_at else None,
         }

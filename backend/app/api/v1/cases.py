@@ -8,7 +8,7 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.models.case import Case
-from app.schemas.case import CaseCreate, CaseUpdate, CaseResponse
+from app.schemas.case import CaseCreate, CaseUpdate, CaseResponse, CaseStatusUpdate
 
 router = APIRouter()
 
@@ -96,6 +96,34 @@ async def update_case(
     await db.commit()
     await db.refresh(case)
     
+    return case
+
+
+@router.patch("/{case_id}/status", response_model=CaseResponse)
+async def update_case_status(
+    case_id: uuid.UUID,
+    status_data: CaseStatusUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """Update case workflow status"""
+    result = await db.execute(select(Case).where(Case.id == case_id))
+    case = result.scalar_one_or_none()
+
+    if not case:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Case {case_id} not found"
+        )
+
+    case.status = status_data.status
+    if status_data.status == "closed" and not case.closed_at:
+        case.closed_at = datetime.utcnow()
+    elif status_data.status != "closed":
+        case.closed_at = None
+
+    await db.commit()
+    await db.refresh(case)
+
     return case
 
 

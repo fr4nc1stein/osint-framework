@@ -44,6 +44,11 @@ class CaseUpdate(BaseModel):
     tags: Optional[List[str]] = None
 
 
+class CaseStatusUpdate(BaseModel):
+    """Schema for changing case workflow status"""
+    status: str = Field(..., pattern="^(open|active|closed|archived)$")
+
+
 class CaseResponse(CaseBase):
     """Schema for case response"""
     id: uuid.UUID

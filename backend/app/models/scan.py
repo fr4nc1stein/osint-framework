@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import List
 from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, ARRAY
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 import uuid
@@ -41,6 +41,7 @@ class Scan(Base):
     progress: Mapped[int] = mapped_column(Integer, default=0)
     total_modules: Mapped[int] = mapped_column(Integer, default=0)
     error_message: Mapped[str | None] = mapped_column(Text)
+    module_statuses: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}", nullable=False)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

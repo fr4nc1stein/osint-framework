@@ -21,8 +21,8 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
 
     total_scans = (await db.execute(select(func.count(Scan.id)))).scalar()
     running_scans = (await db.execute(select(func.count(Scan.id)).where(Scan.status == "running"))).scalar()
-    completed_scans = (await db.execute(select(func.count(Scan.id)).where(Scan.status == "completed"))).scalar()
-    failed_scans = (await db.execute(select(func.count(Scan.id)).where(Scan.status == "error"))).scalar()
+    completed_scans = (await db.execute(select(func.count(Scan.id)).where(Scan.status.in_(["completed", "partial"])))).scalar()
+    failed_scans = (await db.execute(select(func.count(Scan.id)).where(Scan.status.in_(["error", "failed"])))).scalar()
 
     total_indicators = (await db.execute(select(func.count(Indicator.id)))).scalar()
     total_reports = (await db.execute(select(func.count(Report.id)))).scalar()

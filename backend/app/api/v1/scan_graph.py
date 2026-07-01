@@ -37,5 +37,6 @@ async def get_scan_graph(
         "status": scan.status,
         "progress": scan.progress,
         "total_modules": scan.total_modules,
+        "module_statuses": scan.module_statuses,
         "graph": graph_data
     }

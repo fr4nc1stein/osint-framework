@@ -1,5 +1,4 @@
-"""Scan Children & Module Suggestions API"""
-from typing import List
+"""Scan Children API"""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -7,19 +6,8 @@ import uuid
 
 from app.core.database import get_db
 from app.models.scan import Scan
-from app.modules.registry import PLUGIN_REGISTRY, discover_modules
 
 router = APIRouter()
-
-# Node type → applicable module ids
-NODE_MODULE_MAP = {
-    "ip":       ["ip_geolocation", "abuseipdb", "shodan_lookup"],
-    "domain":   ["dns_records", "whois_lookup", "subdomain_enum", "virustotal_domain", "urlscan_lookup"],
-    "email":    ["hibp_breach", "email_domain"],
-    "username": ["hibp_breach"],
-    "phone":    [],
-    "bitcoin":  [],
-}
 
 
 @router.get("/{scan_id}/children")
@@ -51,26 +39,3 @@ async def get_scan_children(
         }
         for s in children
     ]
-
-
-modules_router = APIRouter()
-
-
-@modules_router.get("/suggest")
-async def suggest_modules(node_type: str = "domain"):
-    """Return applicable module ids for a given node type"""
-    if not PLUGIN_REGISTRY:
-        discover_modules()
-
-    suggested_ids = NODE_MODULE_MAP.get(node_type.lower(), [])
-    result = []
-    for mod_id in suggested_ids:
-        cls = PLUGIN_REGISTRY.get(mod_id)
-        if cls:
-            result.append({
-                "module_id": cls.MODULE_ID,
-                "name": cls.DISPLAY_NAME,
-                "description": cls.DESCRIPTION,
-                "requires_api_key": cls.REQUIRES_API_KEY,
-            })
-    return result
