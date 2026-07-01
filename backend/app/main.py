@@ -4,7 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.api.v1 import cases, scans, modules, graph, investigations
+from app.core.queue import close_queue
+from app.core.redis import close_redis
+from app.api.v1 import cases, scans, modules, graph, investigations, websocket, scan_graph
 
 
 @asynccontextmanager
@@ -23,6 +25,8 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     print("🛑 Shutting down OSIF v2.0 Backend...")
+    await close_queue()
+    await close_redis()
     await engine.dispose()
 
 
@@ -51,9 +55,11 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(cases.router, prefix="/api/v1/cases", tags=["Cases"])
     app.include_router(scans.router, prefix="/api/v1/scans", tags=["Scans"])
+    app.include_router(scan_graph.router, prefix="/api/v1/scans", tags=["Scans"])
     app.include_router(modules.router, prefix="/api/v1/modules", tags=["Modules"])
     app.include_router(graph.router, prefix="/api/v1/graph", tags=["Graph"])
     app.include_router(investigations.router, prefix="/api/v1/investigations", tags=["Investigations"])
+    app.include_router(websocket.router, prefix="/ws", tags=["WebSocket"])
     
     # Health endpoints
     @app.get("/health")

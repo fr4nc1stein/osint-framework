@@ -1,11 +1,13 @@
 """Scan Management API Endpoints"""
 from typing import List
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uuid
 
 from app.core.database import get_db
+from app.core.queue import get_queue
 from app.models.scan import Scan
 from app.schemas.scan import ScanCreate, ScanResponse
 
@@ -28,9 +30,23 @@ async def create_scan(
     await db.commit()
     await db.refresh(scan)
     
-    # TODO: Enqueue tasks to arq worker (Phase 2)
-    # for module_id in scan_data.modules:
-    #     await enqueue_scan_task(scan.id, module_id, scan_data.seed_value, scan_data.seed_kind)
+    # Enqueue tasks to arq worker
+    queue = await get_queue()
+    
+    for module_id in scan_data.modules:
+        await queue.enqueue_job(
+            'run_scan_task',
+            str(scan.id),
+            module_id,
+            scan_data.seed_value,
+            scan_data.seed_kind
+        )
+    
+    # Update scan status to running
+    scan.status = "running"
+    scan.started_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(scan)
     
     return scan
 

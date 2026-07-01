@@ -5,7 +5,57 @@ pyvenv.cfg
 share/*
 modules/*/*
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+*.manifest
+*.spec
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Logs
+*.log
+logs/
+
 # Environment files with secrets
 .env
 .env.local
 .env.*.local
+backend/.env
+
+# Docker
+*.pid
+*.seed
+*.pid.lock

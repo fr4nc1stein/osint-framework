@@ -57,25 +57,26 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # Worker service (Phase 2)
-  # worker:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   container_name: osif_worker
-  #   command: arq app.tasks.worker.WorkerSettings
-  #   environment:
-  #     DATABASE_URL: postgresql+asyncpg://osif:osif@postgres:5432/osif
-  #     REDIS_HOST: redis
-  #     REDIS_PORT: 6379
-  #   volumes:
-  #     - ./backend:/app
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   restart: unless-stopped
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: osif_worker
+    command: arq app.tasks.worker.WorkerSettings
+    environment:
+      DATABASE_URL: postgresql+asyncpg://osif:osif@postgres:5432/osif
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      WORKER_CONCURRENCY: 4
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres_data:
