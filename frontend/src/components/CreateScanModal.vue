@@ -1,165 +1,137 @@
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useModulesStore } from '../stores/modules'
+import { useScansStore } from '../stores/scans'
+
+const props = defineProps({
+  defaultCaseId: { type: String, default: null },
+  defaultTarget:  { type: String, default: '' },
+  defaultKind:    { type: String, default: 'domain' },
+  parentScanId:   { type: String, default: null },
+  suggestedModules: { type: Array, default: () => [] },
+})
+
+const emit = defineEmits(['close', 'created'])
+const router = useRouter()
+const modulesStore = useModulesStore()
+const scansStore = useScansStore()
+
+const formData = ref({
+  seed_value: props.defaultTarget,
+  seed_kind: props.defaultKind,
+})
+const selectedModules = ref([...props.suggestedModules])
+const loading = ref(false)
+const error = ref(null)
+
+const modulesByCategory = computed(() => modulesStore.modulesByCategory)
+
+async function handleSubmit() {
+  if (selectedModules.value.length === 0) {
+    error.value = 'Please select at least one module'
+    return
+  }
+  loading.value = true
+  error.value = null
+  try {
+    const payload = {
+      ...formData.value,
+      modules: selectedModules.value,
+    }
+    if (props.defaultCaseId) payload.case_id = props.defaultCaseId
+    if (props.parentScanId) payload.parent_scan_id = props.parentScanId
+
+    const scan = await scansStore.createScan(payload)
+    emit('created', scan.id)
+    router.push(`/scan/${scan.id}`)
+  } catch (err) {
+    error.value = err.response?.data?.detail || 'Failed to create scan'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  if (modulesStore.modules.length === 0) modulesStore.fetchModules()
+})
+</script>
+
 <template>
-  <div 
-    class="fixed inset-0 bg-white/30 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-    @click="$emit('close')"
-  >
-    <div 
-      class="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-      @click.stop
-    >
-      <!-- Header -->
-      <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <h2 class="text-xl font-bold text-gray-900">Create New Scan</h2>
-        <button 
-          @click="$emit('close')" 
-          class="text-gray-400 hover:text-gray-600 text-2xl leading-none"
-          type="button"
-        >
-          ×
-        </button>
-      </div>
-
-      <!-- Form -->
-      <form @submit.prevent="handleSubmit" class="p-6 space-y-6">
-        <!-- Target -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            Target
-          </label>
-          <input
-            v-model="formData.seed_value"
-            type="text"
-            required
-            placeholder="example.com, 8.8.8.8, email@example.com"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
-          />
+  <Teleport to="body">
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" @click.self="$emit('close')">
+      <div class="card w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <!-- Header -->
+        <div class="sticky top-0 px-6 py-4 flex items-center justify-between border-b" style="background-color: var(--card-bg); border-color: var(--border)">
+          <h2 class="text-xl font-bold" style="color: var(--text-primary)">Create New Scan</h2>
+          <button class="btn-ghost text-xl leading-none px-2" type="button" @click="$emit('close')">×</button>
         </div>
 
-        <!-- Target Type -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            Target Type
-          </label>
-          <select
-            v-model="formData.seed_kind"
-            required
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
-          >
-            <option value="domain">Domain</option>
-            <option value="ip">IP Address</option>
-            <option value="email">Email</option>
-          </select>
-        </div>
-
-        <!-- Modules -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            Select Modules ({{ selectedModules.length }})
-          </label>
-          
-          <div v-if="modulesStore.loading" class="text-center py-4 text-gray-500">
-            Loading modules...
+        <form @submit.prevent="handleSubmit" class="p-6 space-y-5">
+          <!-- Target -->
+          <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Target</label>
+            <input v-model="formData.seed_value" type="text" required class="input"
+              placeholder="example.com, 8.8.8.8, email@example.com" />
           </div>
 
-          <div v-else class="space-y-4">
-            <div v-for="(modules, category) in modulesByCategory" :key="category">
-              <div class="text-xs font-semibold text-gray-500 uppercase mb-2">
-                {{ category }}
-              </div>
-              <div class="grid grid-cols-2 gap-2">
-                <label
-                  v-for="module in modules"
-                  :key="module.module_id"
-                  class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    :value="module.module_id"
-                    v-model="selectedModules"
-                    class="rounded text-primary-600 focus:ring-primary-500"
-                  />
-                  <div class="flex-1">
-                    <div class="text-sm font-medium text-gray-900">{{ module.display_name }}</div>
-                    <div class="text-xs text-gray-500">{{ module.description }}</div>
-                  </div>
-                </label>
+          <!-- Type -->
+          <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Target Type</label>
+            <select v-model="formData.seed_kind" required class="input">
+              <option value="domain">Domain</option>
+              <option value="ip">IP Address</option>
+              <option value="email">Email</option>
+              <option value="username">Username</option>
+            </select>
+          </div>
+
+          <!-- Parent scan info -->
+          <div v-if="parentScanId" class="rounded-lg px-3 py-2 text-sm" style="background-color: var(--bg-tertiary); color: var(--text-secondary)">
+            🔗 This will be a child scan derived from the parent graph node.
+          </div>
+
+          <!-- Modules -->
+          <div>
+            <label class="block text-sm font-medium mb-2" style="color: var(--text-secondary)">
+              Modules <span class="ml-1" style="color: var(--text-muted)">({{ selectedModules.length }} selected)</span>
+            </label>
+            <div v-if="modulesStore.loading" class="text-center py-4" style="color: var(--text-muted)">
+              Loading modules…
+            </div>
+            <div v-else class="space-y-4">
+              <div v-for="(mods, category) in modulesByCategory" :key="category">
+                <div class="text-xs font-semibold uppercase mb-2" style="color: var(--text-muted)">{{ category }}</div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <label v-for="m in mods" :key="m.module_id"
+                    class="flex items-start gap-2 p-3 rounded-lg cursor-pointer border transition-all"
+                    :style="selectedModules.includes(m.module_id)
+                      ? 'border-color: var(--accent); background-color: rgba(59,130,246,0.08)'
+                      : 'border-color: var(--border); background-color: var(--bg-primary)'"
+                  >
+                    <input type="checkbox" :value="m.module_id" v-model="selectedModules" class="mt-0.5 rounded" />
+                    <div class="flex-1 min-w-0">
+                      <div class="text-sm font-medium" style="color: var(--text-primary)">{{ m.display_name }}</div>
+                      <div class="text-xs mt-0.5" style="color: var(--text-muted)">{{ m.description }}</div>
+                      <span v-if="m.requires_api_key" class="badge badge-amber text-[10px] mt-1">API key</span>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Actions -->
-        <div class="flex gap-3 pt-4">
-          <button
-            type="submit"
-            :disabled="loading || selectedModules.length === 0"
-            class="flex-1 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-          >
-            {{ loading ? 'Creating...' : 'Create Scan' }}
-          </button>
-          <button
-            type="button"
-            @click="$emit('close')"
-            class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-900"
-          >
-            Cancel
-          </button>
-        </div>
+          <div v-if="error" class="text-sm text-red-400">{{ error }}</div>
 
-        <div v-if="error" class="text-sm text-red-600">
-          {{ error }}
-        </div>
-      </form>
+          <!-- Actions -->
+          <div class="flex gap-3 pt-2">
+            <button type="submit" class="btn-primary flex-1" :disabled="loading || selectedModules.length === 0">
+              {{ loading ? 'Creating…' : 'Create Scan' }}
+            </button>
+            <button type="button" class="btn-secondary" @click="$emit('close')">Cancel</button>
+          </div>
+        </form>
+      </div>
     </div>
-  </div>
+  </Teleport>
 </template>
-
-<script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useModulesStore } from '../stores/modules';
-import { useScansStore } from '../stores/scans';
-
-const emit = defineEmits(['close', 'created']);
-
-const modulesStore = useModulesStore();
-const scansStore = useScansStore();
-
-const formData = ref({
-  seed_value: '',
-  seed_kind: 'domain',
-});
-
-const selectedModules = ref([]);
-const loading = ref(false);
-const error = ref(null);
-
-const modulesByCategory = computed(() => modulesStore.modulesByCategory);
-
-const handleSubmit = async () => {
-  if (selectedModules.value.length === 0) {
-    error.value = 'Please select at least one module';
-    return;
-  }
-
-  loading.value = true;
-  error.value = null;
-
-  try {
-    const scan = await scansStore.createScan({
-      ...formData.value,
-      modules: selectedModules.value,
-    });
-    emit('created', scan);
-  } catch (err) {
-    error.value = err.response?.data?.detail || 'Failed to create scan';
-  } finally {
-    loading.value = false;
-  }
-};
-
-onMounted(() => {
-  if (modulesStore.modules.length === 0) {
-    modulesStore.fetchModules();
-  }
-});
-</script>

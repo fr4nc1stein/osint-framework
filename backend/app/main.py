@@ -7,6 +7,7 @@ from app.core.database import engine, Base
 from app.core.queue import close_queue
 from app.core.redis import close_redis
 from app.api.v1 import cases, scans, modules, graph, investigations, websocket, scan_graph, scan_templates, export
+from app.api.v1 import reports, case_notes, case_graph, scan_children, integrations, stats, ai
 
 
 @asynccontextmanager
@@ -54,13 +55,22 @@ def create_app() -> FastAPI:
     
     # Include routers
     app.include_router(cases.router, prefix="/api/v1/cases", tags=["Cases"])
+    app.include_router(case_graph.router, prefix="/api/v1/cases", tags=["Cases"])
+    app.include_router(reports.router, prefix="/api/v1/cases", tags=["Reports"])
+    app.include_router(case_notes.router, prefix="/api/v1/cases", tags=["Notes"])
+    app.include_router(reports.router_reports_standalone, prefix="/api/v1/reports", tags=["Reports"])
     app.include_router(scans.router, prefix="/api/v1/scans", tags=["Scans"])
     app.include_router(scan_graph.router, prefix="/api/v1/scans", tags=["Scans"])
+    app.include_router(scan_children.router, prefix="/api/v1/scans", tags=["Scans"])
     app.include_router(scan_templates.router, prefix="/api/v1/templates", tags=["Templates"])
     app.include_router(export.router, prefix="/api/v1/export", tags=["Export"])
     app.include_router(modules.router, prefix="/api/v1/modules", tags=["Modules"])
     app.include_router(graph.router, prefix="/api/v1/graph", tags=["Graph"])
     app.include_router(investigations.router, prefix="/api/v1/investigations", tags=["Investigations"])
+    app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["Integrations"])
+    app.include_router(stats.router, prefix="/api/v1", tags=["Stats"])
+    app.include_router(stats.search_router, prefix="/api/v1", tags=["Search"])
+    app.include_router(ai.router, prefix="/api/v1/ai", tags=["AI"])
     app.include_router(websocket.router, prefix="/ws", tags=["WebSocket"])
     
     # Health endpoints

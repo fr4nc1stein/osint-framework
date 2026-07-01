@@ -2,39 +2,129 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme variables ─────────────────────────────────────── */
+:root[data-theme="dark"] {
+  --bg-primary:   #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary:  #334155;
+  --bg-sidebar:   #0b1120;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted:   #64748b;
+  --border:       #334155;
+  --border-subtle: #1e293b;
+  --accent:       #3b82f6;
+  --accent-hover: #2563eb;
+  --card-bg:      #1e293b;
+  --input-bg:     #0f172a;
+  --scrollbar:    #334155;
+}
+
+:root[data-theme="light"] {
+  --bg-primary:   #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary:  #e2e8f0;
+  --bg-sidebar:   #1e293b;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted:   #94a3b8;
+  --border:       #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --accent:       #2563eb;
+  --accent-hover: #1d4ed8;
+  --card-bg:      #ffffff;
+  --input-bg:     #f8fafc;
+  --scrollbar:    #cbd5e1;
+}
+
+/* ── Base ───────────────────────────────────────────────── */
 @layer base {
   * {
     scrollbar-width: thin;
-    scrollbar-color: #334155 transparent;
+    scrollbar-color: var(--scrollbar) transparent;
   }
-  *::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  *::-webkit-scrollbar-track {
-    background: transparent;
-  }
+  *::-webkit-scrollbar { width: 6px; height: 6px; }
+  *::-webkit-scrollbar-track { background: transparent; }
   *::-webkit-scrollbar-thumb {
-    background-color: #334155;
+    background-color: var(--scrollbar);
     border-radius: 3px;
   }
   body {
-    @apply bg-slate-950 text-slate-100 antialiased;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
     font-family: Inter, Roboto, ui-sans-serif, system-ui, sans-serif;
+    @apply antialiased;
   }
 }
 
+/* ── Reusable components ────────────────────────────────── */
 @layer components {
   .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-lg transition-all;
+    @apply font-semibold px-4 py-2 rounded-lg transition-all duration-150;
+    background-color: var(--accent);
+    color: #fff;
   }
+  .btn-primary:hover { background-color: var(--accent-hover); }
+
   .btn-secondary {
-    @apply bg-slate-700 hover:bg-slate-600 text-slate-100 px-4 py-2 rounded-lg transition-all;
+    @apply px-4 py-2 rounded-lg transition-all duration-150;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
   }
+  .btn-secondary:hover { filter: brightness(1.1); }
+
+  .btn-ghost {
+    @apply px-3 py-1.5 rounded-md text-sm transition-all duration-150;
+    color: var(--text-secondary);
+  }
+  .btn-ghost:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
   .card {
-    @apply bg-slate-900 border border-slate-800 rounded-lg;
+    border-radius: 0.5rem;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
   }
+
   .input {
-    @apply w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+    @apply w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+    background-color: var(--input-bg);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+  }
+  .input::placeholder { color: var(--text-muted); }
+
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+  .badge-blue   { @apply bg-blue-500/20 text-blue-300; }
+  .badge-green  { @apply bg-emerald-500/20 text-emerald-300; }
+  .badge-amber  { @apply bg-amber-500/20 text-amber-300; }
+  .badge-red    { @apply bg-red-500/20 text-red-300; }
+  .badge-slate  { @apply bg-slate-500/20 text-slate-300; }
+  .badge-purple { @apply bg-purple-500/20 text-purple-300; }
+
+  .page-header {
+    @apply flex items-center justify-between mb-6;
+  }
+  .page-title {
+    @apply text-2xl font-bold;
+    color: var(--text-primary);
+  }
+
+  .tab-bar {
+    @apply flex gap-1 border-b mb-6;
+    border-color: var(--border);
+  }
+  .tab-btn {
+    @apply px-4 py-2 text-sm font-medium transition-colors duration-150 -mb-px border-b-2 border-transparent;
+    color: var(--text-secondary);
+  }
+  .tab-btn:hover { color: var(--text-primary); }
+  .tab-btn.active {
+    border-bottom-color: var(--accent);
+    color: var(--accent);
   }
 }

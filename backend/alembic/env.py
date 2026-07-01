@@ -11,7 +11,7 @@ from alembic import context
 
 # Import models for autogenerate
 from app.core.database import Base
-from app.models import Case, Scan, Indicator, Edge, Evidence
+from app.models import Case, Scan, Indicator, Edge, Evidence, Report, CaseNote
 from app.models.scan_template import ScanTemplate
 
 # this is the Alembic Config object

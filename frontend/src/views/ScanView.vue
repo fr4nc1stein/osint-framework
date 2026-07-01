@@ -1,248 +1,246 @@
-<template>
-  <div class="min-h-screen bg-gray-50">
-    <!-- Header -->
-    <header class="bg-white border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-4">
-            <button @click="$router.push('/')" class="text-gray-500 hover:text-gray-700">
-              ← Back
-            </button>
-            <div>
-              <h1 class="text-2xl font-bold text-gray-900">{{ scan?.seed_value || 'Loading...' }}</h1>
-              <p class="text-sm text-gray-500">{{ scan?.seed_kind }} scan</p>
-            </div>
-          </div>
-          <div v-if="scan" class="flex items-center gap-3">
-            <span class="px-3 py-1 text-sm rounded-full" :class="statusClass(scan.status)">
-              {{ scan.status }}
-            </span>
-            <div class="relative group">
-              <button class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-900">
-                Export ▾
-              </button>
-              <div class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 hidden group-hover:block z-10">
-                <button @click="exportScan('json')" class="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-900">Export JSON</button>
-                <button @click="exportScan('csv')" class="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-900">Export CSV</button>
-                <button @click="exportScan('graphml')" class="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-900">Export GraphML</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div v-if="loading" class="text-center py-12 text-gray-500">
-        Loading scan details...
-      </div>
-
-      <div v-else-if="scan" class="space-y-6">
-        <!-- Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div class="text-sm text-gray-500 mb-1">Progress</div>
-            <div class="text-3xl font-bold text-gray-900">{{ scan.progress }}/{{ scan.total_modules }}</div>
-          </div>
-          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div class="text-sm text-gray-500 mb-1">Modules</div>
-            <div class="text-3xl font-bold text-primary-600">{{ scan.modules.length }}</div>
-          </div>
-          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div class="text-sm text-gray-500 mb-1">Nodes</div>
-            <div class="text-3xl font-bold text-green-600">{{ graphData?.nodes?.length || 0 }}</div>
-          </div>
-          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div class="text-sm text-gray-500 mb-1">Edges</div>
-            <div class="text-3xl font-bold text-gray-900">{{ graphData?.edges?.length || 0 }}</div>
-          </div>
-        </div>
-
-        <!-- Tabs -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div class="border-b border-gray-200">
-            <nav class="flex gap-8 px-6">
-              <button
-                v-for="tab in tabs"
-                :key="tab.id"
-                @click="activeTab = tab.id"
-                class="py-4 border-b-2 font-medium text-sm transition-colors"
-                :class="activeTab === tab.id 
-                  ? 'border-primary-600 text-primary-600' 
-                  : 'border-transparent text-gray-500 hover:text-gray-700'"
-              >
-                {{ tab.label }}
-              </button>
-            </nav>
-          </div>
-
-          <!-- Graph Tab -->
-          <div v-if="activeTab === 'graph'" class="p-6">
-            <GraphVisualization :graph-data="graphData" />
-          </div>
-
-          <!-- Events Tab -->
-          <div v-if="activeTab === 'events'" class="p-6">
-            <div v-if="events.length === 0" class="text-center py-12 text-gray-500">
-              No events yet
-            </div>
-            <div v-else class="space-y-3">
-              <div
-                v-for="(event, index) in events"
-                :key="index"
-                class="p-4 bg-gray-50 rounded-lg"
-              >
-                <div class="flex items-center justify-between mb-2">
-                  <span class="font-medium text-gray-900">{{ event.type }}</span>
-                  <span class="text-xs text-gray-500">{{ formatTime(event.timestamp) }}</span>
-                </div>
-                <pre class="text-xs text-gray-600 overflow-x-auto">{{ JSON.stringify(event, null, 2) }}</pre>
-              </div>
-            </div>
-          </div>
-
-          <!-- Details Tab -->
-          <div v-if="activeTab === 'details'" class="p-6">
-            <dl class="grid grid-cols-2 gap-4">
-              <div>
-                <dt class="text-sm font-medium text-gray-500">Scan ID</dt>
-                <dd class="mt-1 text-sm text-gray-900 font-mono">{{ scan.id }}</dd>
-              </div>
-              <div>
-                <dt class="text-sm font-medium text-gray-500">Status</dt>
-                <dd class="mt-1"><span class="px-2 py-1 text-xs rounded-full" :class="statusClass(scan.status)">{{ scan.status }}</span></dd>
-              </div>
-              <div>
-                <dt class="text-sm font-medium text-gray-500">Created</dt>
-                <dd class="mt-1 text-sm text-gray-900">{{ new Date(scan.created_at).toLocaleString() }}</dd>
-              </div>
-              <div>
-                <dt class="text-sm font-medium text-gray-500">Started</dt>
-                <dd class="mt-1 text-sm text-gray-900">{{ scan.started_at ? new Date(scan.started_at).toLocaleString() : 'Not started' }}</dd>
-              </div>
-              <div>
-                <dt class="text-sm font-medium text-gray-500">Finished</dt>
-                <dd class="mt-1 text-sm text-gray-900">{{ scan.finished_at ? new Date(scan.finished_at).toLocaleString() : 'Not finished' }}</dd>
-              </div>
-              <div>
-                <dt class="text-sm font-medium text-gray-500">Modules</dt>
-                <dd class="mt-1 text-sm text-gray-900">{{ scan.modules.join(', ') }}</dd>
-              </div>
-            </dl>
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
-</template>
-
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { useRoute } from 'vue-router';
-import { useScansStore } from '../stores/scans';
-import { api } from '../api/client';
-import GraphVisualization from '../components/GraphVisualization.vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useScansStore } from '../stores/scans'
+import { api } from '../api/client'
+import GraphVisualization from '../components/GraphVisualization.vue'
+import GraphSidebar from '../components/GraphSidebar.vue'
+import GraphNodePanel from '../components/GraphNodePanel.vue'
+import CreateScanModal from '../components/CreateScanModal.vue'
 
-const route = useRoute();
-const scansStore = useScansStore();
+const route = useRoute()
+const router = useRouter()
+const scansStore = useScansStore()
 
-const scan = computed(() => scansStore.currentScan);
-const loading = computed(() => scansStore.loading);
+const scan       = computed(() => scansStore.currentScan)
+const loading    = computed(() => scansStore.loading)
 
-const activeTab = ref('graph');
-const graphData = ref(null);
-const events = ref([]);
-const ws = ref(null);
+const graphData      = ref(null)
+const events         = ref([])
+const ws             = ref(null)
+const activeTab      = ref('graph')
+const showExport     = ref(false)
+const selectedNode   = ref(null)
+const showScanModal  = ref(false)
+const scanFromNode   = ref(null)
 
 const tabs = [
-  { id: 'graph', label: 'Graph' },
-  { id: 'events', label: 'Events' },
+  { id: 'graph',   label: 'Graph'   },
+  { id: 'events',  label: 'Events'  },
   { id: 'details', label: 'Details' },
-];
+]
 
-const statusClass = (status) => {
-  const classes = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    running: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    failed: 'bg-red-100 text-red-800',
-  };
-  return classes[status] || 'bg-gray-100 text-gray-800';
-};
+const statusBadge = {
+  queued: 'badge-slate', running: 'badge-blue', completed: 'badge-green', error: 'badge-red',
+}
 
-const formatTime = (timestamp) => {
-  return new Date(timestamp).toLocaleTimeString();
-};
+function fmtTime(ts) { return new Date(ts).toLocaleTimeString() }
 
-const loadGraphData = async () => {
+async function loadGraph() {
   try {
-    const response = await api.getScanGraph(route.params.id);
-    graphData.value = response.data.graph;
-  } catch (error) {
-    console.error('Failed to load graph data:', error);
-  }
-};
+    const { data } = await api.getScanGraph(route.params.id)
+    graphData.value = data.graph
+  } catch {}
+}
 
-const connectWebSocket = () => {
-  // Use relative WebSocket URL so it goes through Nginx proxy
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}/ws/scan/${route.params.id}`;
-  ws.value = new WebSocket(wsUrl);
-
-  ws.value.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    events.value.unshift(data);
-    
-    // Update scan data on progress
+function connectWS() {
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  ws.value = new WebSocket(`${proto}//${window.location.host}/ws/scan/${route.params.id}`)
+  ws.value.onmessage = (e) => {
+    const data = JSON.parse(e.data)
+    events.value.unshift({ ...data, timestamp: Date.now() })
     if (data.type === 'module_complete' || data.type === 'scan_complete') {
-      scansStore.fetchScan(route.params.id);
-      loadGraphData();
+      scansStore.fetchScan(route.params.id)
+      loadGraph()
     }
-  };
-
-  ws.value.onerror = (error) => {
-    console.error('WebSocket error:', error);
-  };
-};
-
-const exportScan = async (format) => {
-  try {
-    let response;
-    let filename;
-    
-    if (format === 'json') {
-      response = await api.exportJSON(route.params.id);
-      filename = `scan_${route.params.id}.json`;
-    } else if (format === 'csv') {
-      response = await api.exportCSV(route.params.id, 'edges');
-      filename = `scan_${route.params.id}_edges.csv`;
-    } else if (format === 'graphml') {
-      response = await api.exportGraphML(route.params.id);
-      filename = `scan_${route.params.id}.graphml`;
-    }
-
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  } catch (error) {
-    console.error('Export failed:', error);
   }
-};
+  ws.value.onerror = () => {}
+}
+
+function closeExport(e) {
+  if (!e.target.closest('.export-menu')) showExport.value = false
+}
+
+function onNodeSelect(node) {
+  selectedNode.value = node
+}
+
+function openScanFromNode(node) {
+  scanFromNode.value = node
+  showScanModal.value = true
+}
+
+async function exportScan(format) {
+  showExport.value = false
+  try {
+    let response, filename
+    if (format === 'json') {
+      response = await api.exportJSON(route.params.id); filename = `scan_${route.params.id}.json`
+    } else if (format === 'csv') {
+      response = await api.exportCSV(route.params.id, 'edges'); filename = `scan_${route.params.id}_edges.csv`
+    } else {
+      response = await api.exportGraphML(route.params.id); filename = `scan_${route.params.id}.graphml`
+    }
+    const url = URL.createObjectURL(new Blob([response.data]))
+    const a = document.createElement('a')
+    a.href = url; a.download = filename; a.click()
+    URL.revokeObjectURL(url)
+  } catch {}
+}
 
 onMounted(async () => {
-  await scansStore.fetchScan(route.params.id);
-  await loadGraphData();
-  connectWebSocket();
-});
+  await scansStore.fetchScan(route.params.id)
+  await loadGraph()
+  connectWS()
+  document.addEventListener('click', closeExport)
+})
 
 onUnmounted(() => {
-  if (ws.value) {
-    ws.value.close();
-  }
-});
+  ws.value?.close()
+  document.removeEventListener('click', closeExport)
+})
 </script>
+
+<template>
+  <div class="h-full flex flex-col overflow-hidden">
+
+    <!-- Loading -->
+    <div v-if="loading && !scan" class="flex items-center justify-center h-full">
+      <div class="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+    </div>
+
+    <template v-else-if="scan">
+
+      <!-- ── Top bar ─────────────────────────────────────────── -->
+      <div class="shrink-0 flex items-center gap-4 px-5 py-3 border-b" style="background-color: var(--bg-secondary); border-color: var(--border)">
+        <button class="flex items-center gap-1 btn-ghost text-sm shrink-0" @click="router.push('/scans')">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          Scans
+        </button>
+
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-base truncate" style="color: var(--text-primary)">{{ scan.seed_value }}</h1>
+            <span class="badge badge-blue text-[10px] shrink-0">{{ scan.seed_kind }}</span>
+            <span class="badge shrink-0" :class="statusBadge[scan.status] || 'badge-slate'">{{ scan.status }}</span>
+          </div>
+        </div>
+
+        <!-- Stat pills -->
+        <div class="hidden md:flex items-center gap-3 shrink-0 text-xs font-mono">
+          <span style="color: var(--text-muted)">
+            <span class="text-blue-400 font-semibold">{{ graphData?.nodes?.length ?? 0 }}</span> nodes
+          </span>
+          <span style="color: var(--text-muted)">
+            <span class="text-purple-400 font-semibold">{{ graphData?.edges?.length ?? 0 }}</span> edges
+          </span>
+          <span style="color: var(--text-muted)">
+            <span class="text-emerald-400 font-semibold">{{ scan.progress }}/{{ scan.total_modules }}</span> modules
+          </span>
+        </div>
+
+        <!-- Tab switcher -->
+        <div class="flex items-center gap-0.5 rounded-md border overflow-hidden shrink-0"
+          style="border-color: var(--border); background-color: var(--bg-primary)">
+          <button v-for="tab in tabs" :key="tab.id"
+            class="px-3 py-1.5 text-xs font-medium transition-all"
+            :style="activeTab === tab.id
+              ? 'background-color: var(--accent); color: #fff'
+              : 'color: var(--text-secondary)'"
+            @click="activeTab = tab.id">
+            {{ tab.label }}
+          </button>
+        </div>
+
+        <!-- Export -->
+        <div class="relative export-menu shrink-0">
+          <button class="btn-secondary flex items-center gap-1.5 text-sm" @click.stop="showExport = !showExport">
+            Export
+            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div v-if="showExport" class="absolute right-0 mt-1 w-44 rounded-lg border shadow-lg z-20 overflow-hidden"
+            style="background-color: var(--card-bg); border-color: var(--border)">
+            <button class="w-full text-left px-4 py-2.5 text-sm hover:brightness-110 transition-all" style="color: var(--text-primary)" @click="exportScan('json')">Export JSON</button>
+            <button class="w-full text-left px-4 py-2.5 text-sm hover:brightness-110 transition-all" style="color: var(--text-primary)" @click="exportScan('csv')">Export CSV</button>
+            <button class="w-full text-left px-4 py-2.5 text-sm hover:brightness-110 transition-all" style="color: var(--text-primary)" @click="exportScan('graphml')">Export GraphML</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Graph tab: 3-column ────────────────────────────── -->
+      <div v-if="activeTab === 'graph'" class="flex-1 flex overflow-hidden">
+        <!-- Left sidebar: grouped indicators -->
+        <GraphSidebar
+          :graph-data="graphData"
+          :seed-value="scan.seed_value"
+          :seed-kind="scan.seed_kind"
+          @node:select="onNodeSelect"
+        />
+
+        <!-- Center: graph canvas -->
+        <div class="flex-1 overflow-hidden">
+          <GraphVisualization
+            :graph-data="graphData"
+            @node:select="onNodeSelect"
+          />
+        </div>
+
+        <!-- Right: node detail panel -->
+        <GraphNodePanel
+          :node="selectedNode"
+          :graph-data="graphData"
+          @close="selectedNode = null"
+          @scan-from-node="openScanFromNode"
+        />
+      </div>
+
+      <!-- ── Events tab ─────────────────────────────────────── -->
+      <div v-if="activeTab === 'events'" class="flex-1 overflow-y-auto p-5">
+        <div v-if="events.length === 0" class="flex items-center justify-center h-40">
+          <p class="text-sm" style="color: var(--text-muted)">Events appear in real-time as the scan runs.</p>
+        </div>
+        <div v-else class="space-y-2">
+          <div v-for="(ev, i) in events" :key="i" class="rounded-lg p-3" style="background-color: var(--bg-secondary); border: 1px solid var(--border)">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-sm font-medium" style="color: var(--text-primary)">{{ ev.type }}</span>
+              <span class="text-xs" style="color: var(--text-muted)">{{ fmtTime(ev.timestamp) }}</span>
+            </div>
+            <pre class="text-xs overflow-x-auto whitespace-pre-wrap" style="color: var(--text-secondary)">{{ JSON.stringify(ev, null, 2) }}</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Details tab ────────────────────────────────────── -->
+      <div v-if="activeTab === 'details'" class="flex-1 overflow-y-auto p-5">
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div v-for="[label, value] in [
+            ['Scan ID',     scan.id],
+            ['Status',      scan.status],
+            ['Target',      scan.seed_value],
+            ['Type',        scan.seed_kind],
+            ['Case',        scan.case_id || 'None'],
+            ['Parent Scan', scan.parent_scan_id || 'None'],
+            ['Created',     new Date(scan.created_at).toLocaleString()],
+            ['Started',     scan.started_at ? new Date(scan.started_at).toLocaleString() : '—'],
+            ['Finished',    scan.finished_at ? new Date(scan.finished_at).toLocaleString() : '—'],
+            ['Modules',     scan.modules.join(', ')],
+          ]" :key="label">
+            <dt class="text-xs font-medium" style="color: var(--text-muted)">{{ label }}</dt>
+            <dd class="mt-0.5 text-sm font-mono break-all" style="color: var(--text-primary)">{{ value }}</dd>
+          </div>
+        </dl>
+      </div>
+    </template>
+  </div>
+
+  <!-- Scan-from-node modal -->
+  <CreateScanModal
+    v-if="showScanModal && scanFromNode"
+    :default-target="scanFromNode.value"
+    :default-kind="scanFromNode.kind"
+    :default-case-id="scan?.case_id"
+    :parent-scan-id="route.params.id"
+    @close="showScanModal = false; scanFromNode = null"
+    @created="() => { showScanModal = false; scanFromNode = null }"
+  />
+</template>
