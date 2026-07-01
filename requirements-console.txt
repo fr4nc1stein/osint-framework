@@ -1,0 +1,14 @@
+# OSIF Console (sploitkit/MSF-style REPL) dependencies
+sploitkit>=0.6.0
+tinyscript>=1.31.0
+
+# OSINT module deps (v1 modules in /modules/)
+dnspython>=2.6.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+shodan>=1.31.0
+tomba-io>=1.0.5
+
+# Optional extras used by some v1 modules
+prettytable>=3.0.0
+terminaltables>=3.1.0

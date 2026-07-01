@@ -88,6 +88,22 @@ services:
     depends_on:
       - backend
 
+  # MSF-style REPL console — docker exec -it osif_console ./osif
+  console:
+    build:
+      context: .
+      dockerfile: Dockerfile.console
+    container_name: osif_console
+    stdin_open: true
+    tty: true
+    env_file:
+      - .env
+    environment:
+      OSIF_API_URL: http://backend:6000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
