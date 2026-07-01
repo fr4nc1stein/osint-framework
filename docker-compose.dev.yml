@@ -81,3 +81,15 @@ services:
 volumes:
   postgres_data:
   redis_data:
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: osif_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - default
