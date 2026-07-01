@@ -12,6 +12,10 @@ RUN apt-get update && apt-get install -y \
 COPY requirements-console.txt .
 RUN pip install --no-cache-dir -r requirements-console.txt
 
+# sploitkit pulls setuptools>=70 which removes pkg_resources as a top-level module.
+# Force-reinstall an older version AFTER all other deps so pkg_resources is importable.
+RUN pip install --no-cache-dir --force-reinstall "setuptools==68.2.2"
+
 # Copy the root-level console files
 COPY osif         ./osif
 COPY commands/    ./commands/

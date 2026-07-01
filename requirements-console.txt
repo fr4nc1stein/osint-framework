@@ -1,14 +1,26 @@
-# OSIF Console (sploitkit/MSF-style REPL) dependencies
+# OSIF Console — sploitkit REPL + v1 module dependencies
+
+# Console framework
 sploitkit>=0.6.0
 tinyscript>=1.31.0
 
-# OSINT module deps (v1 modules in /modules/)
-dnspython>=2.6.0
+# Core HTTP / auth
 requests>=2.31.0
+requests-oauthlib>=2.0.0
 python-dotenv>=1.0.0
+
+# OSINT modules — direct deps
+dnspython>=2.6.0
 shodan>=1.31.0
 tomba-io>=1.0.5
+vt-py>=0.22.0
+malwarebazaar>=0.2.9
+sublist3r>=1.0
+python-Wappalyzer>=0.3.1
+jellyfish>=1.2.0
+python-dateutil>=2.9.0
+pygments>=2.18.0
 
-# Optional extras used by some v1 modules
+# UI / table output
 prettytable>=3.0.0
 terminaltables>=3.1.0
