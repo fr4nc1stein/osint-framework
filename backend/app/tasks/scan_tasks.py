@@ -8,6 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from app.core.config import settings
 from app.modules.registry import get_module_class
 from app.services.graph_service import GraphService
+from app.services.cache_service import CacheService
+from app.services.rate_limiter import check_api_rate_limit
+from app.services.auto_linker import AutoLinkerService
 
 
 async def get_db_session() -> AsyncSession:
@@ -78,13 +81,36 @@ async def run_scan_task(
         # Instantiate module
         module = module_class()
         
-        # Execute module
-        discoveries = await module.execute(
-            target=target,
-            kind=kind,
-            http_client=ctx['http_client'],
-            config={}
-        )
+        # Check rate limit if module has API rate limiting
+        if hasattr(module, 'RATE_LIMIT_API') and module.RATE_LIMIT_API:
+            allowed, limit_info = await check_api_rate_limit(module.RATE_LIMIT_API)
+            if not allowed:
+                raise Exception(
+                    f"Rate limit exceeded for {module.RATE_LIMIT_API}. "
+                    f"Retry after {limit_info.get('retry_after', 'unknown')} seconds"
+                )
+        
+        # Initialize cache service
+        cache_service = CacheService()
+        
+        # Execute module with caching
+        if hasattr(module, 'execute_with_cache'):
+            discoveries = await module.execute_with_cache(
+                target=target,
+                kind=kind,
+                http_client=ctx['http_client'],
+                config={},
+                cache_service=cache_service,
+                use_cache=True
+            )
+        else:
+            # Fallback to regular execute
+            discoveries = await module.execute(
+                target=target,
+                kind=kind,
+                http_client=ctx['http_client'],
+                config={}
+            )
         
         # Process discoveries and build graph
         graph_service = GraphService(db)
@@ -132,6 +158,31 @@ async def run_scan_task(
             
             # Check if scan is complete
             if new_progress >= scan.total_modules:
+                # Run auto-linker for cross-correlation
+                try:
+                    auto_linker = AutoLinkerService(db)
+                    
+                    # Find corroborations
+                    corr_edges = await auto_linker.find_corroborations(scan_id)
+                    
+                    # Infer relationships
+                    inferred_edges = await auto_linker.infer_relationships(scan_id)
+                    
+                    # Get stats
+                    stats = await auto_linker.get_correlation_stats(scan_id)
+                    
+                    # Publish auto-linker event
+                    await publish_event(redis, scan_id, {
+                        "type": "auto_linker_complete",
+                        "corroborations": len(corr_edges),
+                        "inferred": len(inferred_edges),
+                        "stats": stats,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+                except Exception as e:
+                    print(f"Auto-linker error: {e}")
+                
+                # Mark scan as completed
                 await db.execute(
                     update(Scan)
                     .where(Scan.id == scan_id)
