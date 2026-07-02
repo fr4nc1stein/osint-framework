@@ -297,7 +297,7 @@ def build_snapshot(case, scans: list, indicators: list, edges: list, notes: list
         return {
             "id": str(i.id), "kind": i.kind, "value": i.value,
             "confidence": float(i.confidence) if i.confidence is not None else None,
-            "source_module": i.source_module,
+            "source_module": (i.meta or {}).get("source_module", ""),
         }
 
     def _edge(e):
