@@ -41,6 +41,8 @@ export const api = {
   getAllReports: (params) => apiClient.get('/api/v1/reports', { params }),
   getReport: (id) => apiClient.get(`/api/v1/reports/${id}`),
   deleteReport: (id) => apiClient.delete(`/api/v1/reports/${id}`),
+  previewReport: (id) => `/api/v1/reports/${id}/preview`,
+  downloadReportUrl: (id) => `/api/v1/reports/${id}/download`,
 
   // Scans
   createScan: (data) => apiClient.post('/api/v1/scans', data),

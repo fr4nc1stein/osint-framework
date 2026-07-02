@@ -1,7 +1,8 @@
 """Report ORM Model"""
 from datetime import datetime
+from typing import Any, Dict, Optional
 from sqlalchemy import String, Text, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 import uuid
@@ -29,6 +30,8 @@ class Report(Base):
     report_format: Mapped[str] = mapped_column(String(20), default="markdown", nullable=False)
     report_type: Mapped[str] = mapped_column(String(50), default="summary", nullable=False)
     generated_by: Mapped[str] = mapped_column(String(50), default="user", nullable=False)
+    # Point-in-time snapshot of case data used to generate this report
+    snapshot: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
 
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

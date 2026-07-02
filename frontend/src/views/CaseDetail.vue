@@ -125,21 +125,15 @@ async function submitReport() {
 function deleteNote(id)   { casesStore.deleteNote(currentCaseId(), id) }
 function deleteReport(id) { casesStore.deleteReport(id) }
 
-function reportDownloadMeta(r) {
-  const isText = r.report_format === 'text'
-  return {
-    extension: isText ? 'txt' : 'md',
-    mime: isText ? 'text/plain;charset=utf-8' : 'text/markdown;charset=utf-8',
-  }
+function downloadReport(r) {
+  const a = document.createElement('a')
+  a.href = api.downloadReportUrl(r.id)
+  a.download = ''
+  a.click()
 }
 
-function downloadReport(r) {
-  const meta = reportDownloadMeta(r)
-  const blob = new Blob([r.content || ''], { type: meta.mime })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href = url; a.download = `${r.title.replace(/\s+/g, '_')}.${meta.extension}`; a.click()
-  URL.revokeObjectURL(url)
+function previewReport(r) {
+  window.open(api.previewReport(r.id), '_blank')
 }
 
 function onNodeSelect(node) {
@@ -428,16 +422,20 @@ async function openScanFromNode(node) {
             <div class="flex items-center justify-between mb-2">
               <h3 class="font-medium" style="color: var(--text-primary)">{{ r.title }}</h3>
               <div class="flex gap-2">
+                <button v-if="['html','pdf'].includes(r.report_format)" class="btn-ghost text-xs" @click="previewReport(r)">Preview</button>
                 <button class="btn-ghost text-xs" @click="downloadReport(r)">Download</button>
                 <button class="btn-ghost text-xs text-red-400" @click="deleteReport(r.id)">Delete</button>
               </div>
             </div>
             <div class="flex gap-2 mb-2">
               <span class="badge badge-blue">{{ r.report_type }}</span>
-              <span class="badge badge-slate">{{ r.report_format }}</span>
+              <span class="badge" :class="r.report_format === 'pdf' ? 'badge-red' : r.report_format === 'html' ? 'badge-amber' : 'badge-slate'">
+                {{ r.report_format.toUpperCase() }}
+              </span>
             </div>
             <p class="text-xs" style="color: var(--text-muted)">Generated {{ fmtDate(r.generated_at) }}</p>
-            <pre v-if="r.content" class="mt-3 text-xs p-3 rounded overflow-auto max-h-40 whitespace-pre-wrap"
+            <pre v-if="r.content && !['html','pdf'].includes(r.report_format)"
+              class="mt-3 text-xs p-3 rounded overflow-auto max-h-40 whitespace-pre-wrap"
               style="background-color: var(--bg-primary); color: var(--text-secondary)">{{ r.content }}</pre>
           </div>
         </div>
@@ -501,6 +499,8 @@ async function openScanFromNode(node) {
               <select v-model="reportForm.report_format" class="input">
                 <option value="markdown">Markdown</option>
                 <option value="text">Plain Text</option>
+                <option value="html">HTML</option>
+                <option value="pdf">PDF</option>
               </select>
             </div>
           </div>
