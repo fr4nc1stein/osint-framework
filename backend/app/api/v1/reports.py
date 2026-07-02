@@ -275,12 +275,8 @@ async def download_report(report_id: uuid.UUID, db: AsyncSession = Depends(get_d
     fmt = report.report_format
 
     if fmt == "pdf":
-        if report.snapshot:
-            html = render_html(report.snapshot, report.title, report.report_type)
-        else:
-            html = render_markdown_to_html(report.content or "", report.title)
         try:
-            pdf_bytes = render_pdf(html)
+            pdf_bytes = render_pdf(report.snapshot or {}, report.title, report.report_type)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
         return Response(

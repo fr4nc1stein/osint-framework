@@ -374,14 +374,173 @@ def render_html(snapshot: Dict[str, Any], title: str, report_type: str) -> str:
     return html
 
 
-def render_pdf(html: str) -> bytes:
-    """Convert HTML to PDF bytes using xhtml2pdf."""
-    from xhtml2pdf import pisa
+def render_pdf(snapshot: Dict[str, Any], title: str, report_type: str) -> bytes:
+    """Render a structured PDF from a snapshot using reportlab (pure Python, no system deps)."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    )
+
+    case  = snapshot.get("case", {})
+    scans = snapshot.get("scans", [])
+    inds  = snapshot.get("indicators", [])
+    edges = snapshot.get("edges", [])
+    notes = snapshot.get("notes", [])
+    gen_at = snapshot.get("generated_at", "")
 
     buf = io.BytesIO()
-    pisa_status = pisa.CreatePDF(html, dest=buf)
-    if pisa_status.err:
-        raise RuntimeError(f"PDF generation failed: {pisa_status.err}")
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=20*mm, rightMargin=20*mm,
+        topMargin=20*mm, bottomMargin=20*mm,
+    )
+
+    styles = getSampleStyleSheet()
+    h1  = ParagraphStyle("h1",  parent=styles["Heading1"], fontSize=18, spaceAfter=4, textColor=colors.HexColor("#0f172a"))
+    h2  = ParagraphStyle("h2",  parent=styles["Heading2"], fontSize=12, spaceBefore=14, spaceAfter=4, textColor=colors.HexColor("#1e293b"))
+    body = ParagraphStyle("body", parent=styles["Normal"], fontSize=9, leading=14, textColor=colors.HexColor("#334155"))
+    muted = ParagraphStyle("muted", parent=styles["Normal"], fontSize=8, textColor=colors.HexColor("#64748b"))
+    mono = ParagraphStyle("mono", parent=styles["Normal"], fontSize=8, fontName="Courier", textColor=colors.HexColor("#1e293b"))
+
+    ACCENT   = colors.HexColor("#3b82f6")
+    HDR_BG   = colors.HexColor("#f8fafc")
+    BORDER   = colors.HexColor("#e2e8f0")
+    ROW_ALT  = colors.HexColor("#f8fafc")
+
+    def tbl_style(has_alt=True):
+        base = [
+            ("BACKGROUND",   (0, 0), (-1, 0),  HDR_BG),
+            ("TEXTCOLOR",    (0, 0), (-1, 0),  colors.HexColor("#475569")),
+            ("FONTSIZE",     (0, 0), (-1, 0),  8),
+            ("FONTNAME",     (0, 0), (-1, 0),  "Helvetica-Bold"),
+            ("BOTTOMPADDING",(0, 0), (-1, 0),  6),
+            ("TOPPADDING",   (0, 0), (-1, 0),  6),
+            ("FONTSIZE",     (0, 1), (-1, -1), 8),
+            ("FONTNAME",     (0, 1), (-1, -1), "Helvetica"),
+            ("TOPPADDING",   (0, 1), (-1, -1), 4),
+            ("BOTTOMPADDING",(0, 1), (-1, -1), 4),
+            ("GRID",         (0, 0), (-1, -1), 0.5, BORDER),
+            ("VALIGN",       (0, 0), (-1, -1), "TOP"),
+        ]
+        return TableStyle(base)
+
+    story = []
+
+    # ── Title & meta ──────────────────────────────────────────
+    story.append(Paragraph(title, h1))
+    story.append(Paragraph(
+        f"{case.get('case_number','')} &nbsp;·&nbsp; "
+        f"Status: <b>{case.get('status','')}</b> &nbsp;·&nbsp; "
+        f"Severity: <b>{case.get('priority','')}</b> &nbsp;·&nbsp; "
+        f"Generated: {_fmt_dt(gen_at)}",
+        muted
+    ))
+    if case.get("assigned_to"):
+        story.append(Paragraph(f"Analyst: {case['assigned_to']}", muted))
+    story.append(HRFlowable(width="100%", thickness=1, color=BORDER, spaceAfter=8))
+
+    if case.get("description"):
+        story.append(Paragraph("Case Description", h2))
+        story.append(Paragraph(case["description"], body))
+
+    # ── Scans ─────────────────────────────────────────────────
+    story.append(Paragraph("Scan Summary", h2))
+    if scans:
+        data = [["Target", "Kind", "Status", "Modules", "Started"]]
+        for s in scans:
+            data.append([
+                Paragraph(s.get("seed_value", ""), mono),
+                s.get("seed_kind", ""),
+                s.get("status", ""),
+                f"{s.get('progress',0)}/{s.get('total_modules',0)}",
+                _fmt_dt(s.get("created_at", "")),
+            ])
+        t = Table(data, colWidths=[55*mm, 22*mm, 22*mm, 20*mm, 40*mm])
+        t.setStyle(tbl_style())
+        story.append(t)
+    else:
+        story.append(Paragraph("No scans have been run for this case.", muted))
+
+    # ── Indicators ────────────────────────────────────────────
+    if report_type in {"technical", "full", "summary"} and inds:
+        story.append(Paragraph("Indicators", h2))
+        data = [["Kind", "Value", "Confidence", "Source"]]
+        for i in inds[:50]:
+            conf = i.get("confidence")
+            conf_str = f"{int(float(conf)*100)}%" if conf is not None else "—"
+            data.append([
+                i.get("kind", ""),
+                Paragraph(i.get("value", ""), mono),
+                conf_str,
+                i.get("source_module", ""),
+            ])
+        t = Table(data, colWidths=[22*mm, 80*mm, 22*mm, 35*mm])
+        t.setStyle(tbl_style())
+        story.append(t)
+
+    # ── Relationships ─────────────────────────────────────────
+    if report_type in {"technical", "full"} and edges:
+        ind_map = {i["id"]: i for i in inds}
+        story.append(Paragraph("Relationships", h2))
+        data = [["Source", "Relationship", "Target", "Module", "Conf"]]
+        for e in edges[:50]:
+            src = ind_map.get(e.get("src_id", ""), {})
+            dst = ind_map.get(e.get("dst_id", ""), {})
+            conf = e.get("confidence")
+            conf_str = f"{int(float(conf)*100)}%" if conf is not None else "—"
+            data.append([
+                Paragraph(src.get("value", str(e.get("src_id",""))), mono),
+                e.get("relationship_type", ""),
+                Paragraph(dst.get("value", str(e.get("dst_id",""))), mono),
+                e.get("source_module", ""),
+                conf_str,
+            ])
+        t = Table(data, colWidths=[40*mm, 32*mm, 40*mm, 30*mm, 17*mm])
+        t.setStyle(tbl_style())
+        story.append(t)
+
+    # ── Timeline ──────────────────────────────────────────────
+    if report_type in {"timeline", "full"}:
+        story.append(Paragraph("Timeline", h2))
+        events = [{"time": case.get("created_at",""), "label": "Case created", "detail": case.get("title","")}]
+        for s in scans:
+            events.append({"time": s.get("created_at",""), "label": f"Scan started", "detail": s.get("seed_value","")})
+            if s.get("finished_at"):
+                events.append({"time": s.get("finished_at",""), "label": f"Scan {s.get('status','done')}", "detail": s.get("seed_value","")})
+        events.sort(key=lambda e: e.get("time") or "")
+        for ev in events:
+            story.append(Paragraph(f"<b>{_fmt_dt(ev['time'])}</b> — {ev['label']}: {ev.get('detail','')}", body))
+
+    # ── Notes ─────────────────────────────────────────────────
+    story.append(Paragraph("Notes", h2))
+    if notes:
+        for n in notes:
+            story.append(Paragraph(f"<i>{_fmt_dt(n.get('created_at',''))}</i>", muted))
+            story.append(Paragraph(n.get("content", ""), body))
+            story.append(Spacer(1, 4))
+    else:
+        story.append(Paragraph("No case notes recorded.", muted))
+
+    # ── Follow-up ─────────────────────────────────────────────
+    if report_type in {"summary", "full"}:
+        story.append(Paragraph("Analyst Follow-Up", h2))
+        high_signal = [e for e in edges if e.get("relationship_type","").upper() in
+                       {"FOUND_IN_BREACH","HAS_VULNERABILITY","FLAGGED_AS","HAS_REPUTATION"}]
+        if high_signal:
+            story.append(Paragraph(f"• Review {len(high_signal)} high-signal relationship(s) for validation.", body))
+        if any(s.get("status") in {"partial","failed","error"} for s in scans):
+            story.append(Paragraph("• Review failed or partial scans and rerun missing modules.", body))
+        story.append(Paragraph("• Validate all findings against source evidence before external distribution.", body))
+
+    # ── Footer ────────────────────────────────────────────────
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=BORDER))
+    story.append(Paragraph(f"Generated by OSIF v2 · {_fmt_dt(gen_at)} · {title}", muted))
+
+    doc.build(story)
     return buf.getvalue()
 
 
