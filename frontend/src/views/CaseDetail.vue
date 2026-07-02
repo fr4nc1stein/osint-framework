@@ -125,11 +125,21 @@ async function submitReport() {
 function deleteNote(id)   { casesStore.deleteNote(currentCaseId(), id) }
 function deleteReport(id) { casesStore.deleteReport(id) }
 
-function downloadReport(r) {
+async function downloadReport(r) {
+  const extMap = { markdown: 'md', text: 'txt', html: 'html', pdf: 'pdf' }
+  const ext = extMap[r.report_format] || 'md'
+  const filename = `${r.title.replace(/\s+/g, '_')}.${ext}`
+
+  const res = await fetch(api.downloadReportUrl(r.id))
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
-  a.href = api.downloadReportUrl(r.id)
-  a.download = ''
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
   a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 function previewReport(r) {
