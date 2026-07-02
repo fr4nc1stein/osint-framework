@@ -858,3 +858,92 @@ Add explicit failure behavior for migration-heavy work:
 - clear operator error when encrypted DB secrets cannot be decrypted
 
 Phase 3.2 should fail safely: scans may use `.env` fallback during migration, but the app should never expose stored secrets or silently ignore decryption failures.
+
+---
+
+## Implementation Log
+
+**Last updated:** 2026-07-02
+
+### ✅ Step 1 — Case Edit UX (Done)
+
+**Commits:** `15fd692`
+
+- `CaseEditModal.vue` — full edit form: title, description, status, severity, case type, assigned analyst, client, jurisdiction, target name/aliases/location/DOB, tags, closed reason
+- Inline status and severity quick-dropdowns in the `CaseDetail` header — change without opening modal
+- Edit button on each case card in `CasesList.vue`
+- `closed_reason` field added to `Case` model, `CaseUpdate` schema, `PATCH /status` endpoint
+- Alembic migration: `a9166d45ecd7_add_closed_reason_to_cases.py`
+- `form-label` utility class added to `style.css`
+
+**Deviations from plan:**
+
+- `PATCH /api/v1/cases/{case_id}/priority` was not added as a separate endpoint — quick priority changes go through the existing `PUT /{case_id}` via the store's `updateCase()`.
+- Closed reason clears automatically when a case is reopened (handled in the PATCH status endpoint).
+
+---
+
+### ✅ Step 2 — Report Renderer (Done)
+
+**Commits:** `e702888`, `4bbda6b`, `8ecb8ca`, `d43e32f`
+
+- `backend/app/services/report_renderer.py` — new service with:
+  - `build_snapshot()` — captures point-in-time JSON of case, scans, indicators, edges, notes
+  - `render_html()` — self-contained HTML report from snapshot (inline CSS, no external deps)
+  - `render_pdf()` — structured PDF via `reportlab` (pure Python, tables for indicators/relationships)
+  - `render_markdown_to_html()` — wraps existing markdown content in an HTML page for preview
+- `GET /api/v1/reports/{id}/download` — serves correct Content-Type + filename per format
+- `GET /api/v1/reports/{id}/preview` — renders HTML in browser tab
+- `snapshot` JSONB column added to `reports` table — reports are frozen at generation time
+- Frontend: HTML and PDF format options added to the Generate Report form
+- Frontend: Preview button on HTML/PDF report cards
+- Frontend: Download uses `fetch()` → blob → object URL — page no longer navigates away on download
+- Alembic migration: `77b230d431b5_add_snapshot_to_reports.py`
+
+**Bugs fixed during implementation:**
+
+| Bug | Cause | Fix |
+|-----|-------|-----|
+| `AttributeError: 'Indicator' has no 'source_module'` | `Indicator` model stores source in `meta` JSONB, not a column | Read `i.meta.get("source_module", "")` |
+| Download saved as `download.html` and navigated away | `a.download = ''` uses URL path segment as filename | `fetch()` as blob, set `a.download = filename` explicitly |
+| PDF opened as "Failed to load PDF document" | `xhtml2pdf` crashes with SIGILL (AVX instructions not supported by Docker host CPU) | Replaced with pure `reportlab` renderer — no C extensions |
+
+**Deviations from plan:**
+
+- PDF is generated directly from the snapshot via `reportlab` (not HTML-to-PDF). Output is structured and clean but not pixel-perfect HTML styling. HTML-to-PDF (Playwright) remains a Phase 3.3 option.
+- `xhtml2pdf` removed from `requirements.txt` entirely — `reportlab` was already a transitive dependency and works correctly on this CPU.
+
+---
+
+### ⏳ Step 3 — Secrets Foundation (Pending)
+
+- `backend/app/core/crypto.py` — Fernet encryption using `APP_ENCRYPTION_KEY`
+- `IntegrationCredential` model + schema + migration
+- `backend/app/services/credentials.py` — DB-first lookup with `.env` fallback, Redis TTL cache
+- Integration CRUD + test endpoints (`PUT`, `POST /test`, `DELETE`, `POST /import-env`)
+- Update `IntegrationsView.vue` — save/test credentials, masked display
+
+---
+
+### ⏳ Step 4 — Migrate OSINT Modules (Pending, depends on Step 3)
+
+- Worker loads credentials at scan start and passes them into module execution context
+- Modules to migrate: Shodan, VirusTotal, AbuseIPDB, Tomba, URLScan
+- Modules stop calling `os.getenv()` directly
+
+---
+
+### ⏳ Step 5 — AI Settings (Pending, depends on Step 3)
+
+- `AISetting` model + schema + migration
+- `GET/PUT /api/v1/ai/settings` — read/write DB-backed AI config
+- `POST /api/v1/ai/test` — test active provider
+- Update `AiSettingsView.vue` — provider selector, model, key input, base URL (Ollama), test button
+
+---
+
+### ⏳ Step 6 — Setup Experience (Pending, depends on Steps 3–5)
+
+- First-run setup route or admin settings area
+- `.env` import action (`POST /api/v1/integrations/import-env`)
+- "Configured from DB" vs "Using environment fallback" status indicators
