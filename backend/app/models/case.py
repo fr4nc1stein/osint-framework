@@ -50,6 +50,7 @@ class Case(Base):
         nullable=False
     )
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closed_reason: Mapped[str | None] = mapped_column(Text)
     
     # Relationships
     scans: Mapped[List["Scan"]] = relationship(

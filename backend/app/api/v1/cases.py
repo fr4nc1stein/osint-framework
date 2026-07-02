@@ -120,6 +120,9 @@ async def update_case_status(
         case.closed_at = datetime.utcnow()
     elif status_data.status != "closed":
         case.closed_at = None
+        case.closed_reason = None
+    if status_data.closed_reason is not None:
+        case.closed_reason = status_data.closed_reason
 
     await db.commit()
     await db.refresh(case)

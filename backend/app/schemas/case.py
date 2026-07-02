@@ -42,11 +42,13 @@ class CaseUpdate(BaseModel):
     target_location: Optional[str] = None
     target_dob: Optional[date] = None
     tags: Optional[List[str]] = None
+    closed_reason: Optional[str] = None
 
 
 class CaseStatusUpdate(BaseModel):
     """Schema for changing case workflow status"""
     status: str = Field(..., pattern="^(open|active|closed|archived)$")
+    closed_reason: Optional[str] = None
 
 
 class CaseResponse(CaseBase):
@@ -56,5 +58,6 @@ class CaseResponse(CaseBase):
     created_at: datetime
     updated_at: datetime
     closed_at: Optional[datetime] = None
-    
+    closed_reason: Optional[str] = None
+
     model_config = {"from_attributes": True}

@@ -2,11 +2,13 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCasesStore } from '../stores/cases'
+import CaseEditModal from '../components/CaseEditModal.vue'
 
 const router = useRouter()
 const casesStore = useCasesStore()
 
 const showCreateModal = ref(false)
+const editingCase     = ref(null)
 const filterStatus = ref('all')
 
 const form = ref({ title: '', description: '', priority: 'medium', status: 'open', assigned_to: '', tags: '' })
@@ -94,23 +96,32 @@ async function submit() {
     <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       <div
         v-for="c in filtered" :key="c.id"
-        class="card p-4 cursor-pointer hover:border-blue-500/40 transition-all duration-150"
-        @click="router.push(`/cases/${c.id}`)"
+        class="card p-4 hover:border-blue-500/40 transition-all duration-150"
       >
         <div class="flex items-start justify-between gap-2 mb-2">
-          <span class="text-xs font-mono" style="color: var(--text-muted)">{{ c.case_number }}</span>
-          <div class="flex gap-1.5">
+          <span class="text-xs font-mono cursor-pointer" style="color: var(--text-muted)" @click="router.push(`/cases/${c.id}`)">{{ c.case_number }}</span>
+          <div class="flex gap-1.5 items-center">
             <span class="badge" :class="statusMap[c.status]?.cls || 'badge-slate'">
               {{ statusMap[c.status]?.label || c.status }}
             </span>
             <span class="badge" :class="priorityMap[c.priority]?.cls || 'badge-slate'">
               {{ priorityMap[c.priority]?.label || c.priority }}
             </span>
+            <!-- Edit button -->
+            <button
+              class="btn-ghost p-0.5 rounded"
+              title="Edit case"
+              @click.stop="editingCase = c"
+            >
+              <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+              </svg>
+            </button>
           </div>
         </div>
 
-        <h3 class="font-semibold mb-1 line-clamp-1" style="color: var(--text-primary)">{{ c.title }}</h3>
-        <p v-if="c.description" class="text-sm mb-3 line-clamp-2" style="color: var(--text-secondary)">{{ c.description }}</p>
+        <h3 class="font-semibold mb-1 line-clamp-1 cursor-pointer" style="color: var(--text-primary)" @click="router.push(`/cases/${c.id}`)">{{ c.title }}</h3>
+        <p v-if="c.description" class="text-sm mb-3 line-clamp-2 cursor-pointer" style="color: var(--text-secondary)" @click="router.push(`/cases/${c.id}`)">{{ c.description }}</p>
 
         <div class="flex items-center justify-between text-xs mt-3 pt-3 border-t" style="border-color: var(--border); color: var(--text-muted)">
           <span v-if="c.assigned_to">{{ c.assigned_to }}</span>
@@ -123,6 +134,14 @@ async function submit() {
         </div>
       </div>
     </div>
+
+    <!-- Edit Case Modal -->
+    <CaseEditModal
+      v-if="editingCase"
+      :case-data="editingCase"
+      @close="editingCase = null"
+      @saved="casesStore.fetchCases(); editingCase = null"
+    />
 
     <!-- Create Case Modal -->
     <Teleport to="body">

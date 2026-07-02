@@ -6,6 +6,7 @@ import GraphVisualization from '../components/GraphVisualization.vue'
 import GraphSidebar from '../components/GraphSidebar.vue'
 import GraphNodePanel from '../components/GraphNodePanel.vue'
 import CreateScanModal from '../components/CreateScanModal.vue'
+import CaseEditModal from '../components/CaseEditModal.vue'
 import { api } from '../api/client'
 
 const route = useRoute()
@@ -17,6 +18,7 @@ const activeTab = ref('scans')
 const tabs      = ['scans', 'graph', 'timeline', 'notes', 'reports']
 
 const showScanModal  = ref(false)
+const showEditModal  = ref(false)
 const newNote        = ref('')
 const showReportModal = ref(false)
 const reportForm     = ref({ title: '', report_type: 'summary', report_format: 'markdown' })
@@ -144,6 +146,14 @@ function onNodeSelect(node) {
   selectedNode.value = node
 }
 
+async function quickStatus(status) {
+  await casesStore.updateCase(currentCaseId(), { status })
+}
+
+async function quickPriority(priority) {
+  await casesStore.updateCase(currentCaseId(), { priority })
+}
+
 function unique(values) {
   return [...new Set(values.filter(Boolean))]
 }
@@ -212,23 +222,59 @@ async function openScanFromNode(node) {
         </button>
 
         <div class="flex items-start justify-between gap-4 mb-4">
-          <div>
+          <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-1">
               <span class="text-xs font-mono" style="color: var(--text-muted)">{{ currentCase.case_number }}</span>
-              <span class="badge" :class="statusMap[currentCase.status] || 'badge-slate'">{{ currentCase.status }}</span>
-              <span class="badge" :class="priorityMap[currentCase.priority] || 'badge-slate'">{{ currentCase.priority }}</span>
+              <!-- Quick status dropdown -->
+              <select
+                :value="currentCase.status"
+                class="badge cursor-pointer text-xs border-0 outline-none"
+                :class="statusMap[currentCase.status] || 'badge-slate'"
+                style="appearance: none; padding-right: 0.5rem; background-color: transparent;"
+                @change="quickStatus($event.target.value)"
+              >
+                <option value="open">open</option>
+                <option value="active">active</option>
+                <option value="closed">closed</option>
+                <option value="archived">archived</option>
+              </select>
+              <!-- Quick priority dropdown -->
+              <select
+                :value="currentCase.priority"
+                class="badge cursor-pointer text-xs border-0 outline-none"
+                :class="priorityMap[currentCase.priority] || 'badge-slate'"
+                style="appearance: none; padding-right: 0.5rem; background-color: transparent;"
+                @change="quickPriority($event.target.value)"
+              >
+                <option value="critical">critical</option>
+                <option value="high">high</option>
+                <option value="medium">medium</option>
+                <option value="low">low</option>
+              </select>
             </div>
-            <h1 class="text-2xl font-bold" style="color: var(--text-primary)">{{ currentCase.title }}</h1>
+            <h1 class="text-2xl font-bold truncate" style="color: var(--text-primary)">{{ currentCase.title }}</h1>
             <p v-if="currentCase.description" class="text-sm mt-1" style="color: var(--text-secondary)">{{ currentCase.description }}</p>
             <div class="flex flex-wrap gap-2 mt-2">
               <span v-if="currentCase.assigned_to" class="text-xs" style="color: var(--text-muted)">👤 {{ currentCase.assigned_to }}</span>
+              <span v-if="currentCase.client" class="text-xs" style="color: var(--text-muted)">🏢 {{ currentCase.client }}</span>
               <span v-for="tag in (currentCase.tags || [])" :key="tag" class="badge badge-slate text-[10px]">{{ tag }}</span>
             </div>
+            <div v-if="currentCase.closed_reason && currentCase.status === 'closed'" class="mt-1">
+              <span class="text-xs" style="color: var(--text-muted)">Closed: {{ currentCase.closed_reason }}</span>
+            </div>
           </div>
-          <button class="btn-primary shrink-0 flex items-center gap-2" @click="showScanModal = true">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            Add Scan
-          </button>
+          <div class="flex items-center gap-2 shrink-0">
+            <button class="btn-secondary flex items-center gap-2" @click="showEditModal = true">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+              </svg>
+              Edit
+            </button>
+            <button class="btn-primary flex items-center gap-2" @click="showScanModal = true">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              Add Scan
+            </button>
+          </div>
         </div>
 
         <!-- Tab bar -->
@@ -401,6 +447,14 @@ async function openScanFromNode(node) {
 
     </template>
   </div>
+
+  <!-- Edit case modal -->
+  <CaseEditModal
+    v-if="showEditModal && currentCase"
+    :case-data="currentCase"
+    @close="showEditModal = false"
+    @saved="casesStore.fetchCase(caseId)"
+  />
 
   <!-- Add scan modal -->
   <CreateScanModal

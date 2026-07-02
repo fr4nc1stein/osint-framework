@@ -96,6 +96,11 @@
   }
   .input::placeholder { color: var(--text-muted); }
 
+  .form-label {
+    @apply block text-sm font-medium mb-1;
+    color: var(--text-secondary);
+  }
+
   .badge {
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
   }
