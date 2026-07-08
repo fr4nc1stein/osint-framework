@@ -39,6 +39,8 @@ services:
     command: uvicorn app.main:app --reload --host 0.0.0.0 --port 6000
     ports:
       - "6000:6000"
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://osif:osif@postgres:5432/osif
       DATABASE_HOST: postgres
@@ -63,6 +65,8 @@ services:
       dockerfile: Dockerfile
     container_name: osif_worker
     command: arq app.tasks.worker.WorkerSettings
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://osif:osif@postgres:5432/osif
       REDIS_HOST: redis

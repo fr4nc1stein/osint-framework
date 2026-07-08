@@ -31,6 +31,9 @@ tomba-io==1.0.5
 # Utilities
 python-dateutil==2.9.0
 
+# Encryption (pyaes = pure Python, no C extensions / no AVX2 requirement)
+pyaes==1.6.1
+
 # Report rendering
 markdown==3.6
 

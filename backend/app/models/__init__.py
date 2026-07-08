@@ -6,5 +6,6 @@ from app.models.edge import Edge
 from app.models.evidence import Evidence
 from app.models.report import Report
 from app.models.case_note import CaseNote
+from app.models.integration_credential import IntegrationCredential
 
-__all__ = ["Case", "Scan", "Indicator", "Edge", "Evidence", "Report", "CaseNote"]
+__all__ = ["Case", "Scan", "Indicator", "Edge", "Evidence", "Report", "CaseNote", "IntegrationCredential"]

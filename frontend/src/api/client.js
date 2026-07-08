@@ -64,6 +64,11 @@ export const api = {
 
   // Integrations
   getIntegrations: () => apiClient.get('/api/v1/integrations'),
+  getIntegration: (provider) => apiClient.get(`/api/v1/integrations/${provider}`),
+  saveIntegration: (provider, data) => apiClient.put(`/api/v1/integrations/${provider}`, data),
+  deleteIntegration: (provider) => apiClient.delete(`/api/v1/integrations/${provider}`),
+  testIntegration: (provider) => apiClient.post(`/api/v1/integrations/${provider}/test`),
+  importEnvIntegrations: () => apiClient.post('/api/v1/integrations/import-env'),
 
   // AI
   getAiSettings: () => apiClient.get('/api/v1/ai/settings'),
