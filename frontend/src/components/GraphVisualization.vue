@@ -19,6 +19,7 @@ let cy = null
 const KIND_BG = {
   domain:       '#0c2340',  // navy
   subdomain:    '#0c2340',  // navy (same family as domain)
+  host:         '#1a0e38',  // dark violet (alias for hostname)
   hostname:     '#1a0e38',  // dark violet
   ip:           '#0d2b1e',  // dark green
   nameserver:   '#1f1500',  // dark amber
@@ -45,6 +46,7 @@ const KIND_BG = {
 const KIND_ACCENT = {
   domain:       '#3b82f6',  // blue
   subdomain:    '#60a5fa',  // lighter blue
+  host:         '#a78bfa',  // violet
   hostname:     '#a78bfa',  // violet
   ip:           '#10b981',  // emerald
   nameserver:   '#f59e0b',  // amber
@@ -71,6 +73,7 @@ const KIND_ACCENT = {
 const KIND_SIZE = {
   domain:       50,  // largest — primary target
   subdomain:    36,
+  host:         34,
   hostname:     34,
   ip:           44,  // second largest — critical infra
   nameserver:   36,
@@ -104,6 +107,10 @@ const KIND_ICONS = {
     '<circle cx="12" cy="12" r="10"/>' +
     '<path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>' +
     '<path d="M2 12h20"/><path d="M12 2v5m0 10v5"/>',
+  host:
+    '<rect width="20" height="8" x="2" y="2" rx="2"/>' +
+    '<rect width="20" height="8" x="2" y="14" rx="2"/>' +
+    '<line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
   hostname:
     '<rect width="20" height="8" x="2" y="2" rx="2"/>' +
     '<rect width="20" height="8" x="2" y="14" rx="2"/>' +

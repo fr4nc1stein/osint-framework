@@ -19,6 +19,7 @@ class EmailHunterModule(BaseOSINTModule):
     ACCEPTS: ClassVar[List[str]] = ["domain"]
     REQUIRES_API_KEY: ClassVar[bool] = True
     API_KEY_ENV_VAR: ClassVar[str] = "TOMBA_API_KEY"
+    PROVIDER_ID: ClassVar[str] = "tomba"
     
     async def execute(
         self,
@@ -31,9 +32,9 @@ class EmailHunterModule(BaseOSINTModule):
         """Execute email discovery"""
         results = []
         
-        api_key = os.getenv('TOMBA_API_KEY')
-        secret_key = os.getenv('TOMBA_SECRET_KEY')
-        
+        api_key = config.get('api_key') or os.getenv('TOMBA_API_KEY')
+        secret_key = config.get('secret_key') or os.getenv('TOMBA_SECRET_KEY')
+
         if not api_key or not secret_key:
             return results  # Skip if not configured
         

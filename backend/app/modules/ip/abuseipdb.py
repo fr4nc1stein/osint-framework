@@ -19,6 +19,7 @@ class AbuseIPDBModule(BaseOSINTModule):
     ACCEPTS: ClassVar[List[str]] = ["ip"]
     REQUIRES_API_KEY: ClassVar[bool] = True
     API_KEY_ENV_VAR: ClassVar[str] = "ABUSEIPDB_API_KEY"
+    PROVIDER_ID: ClassVar[str] = "abuseipdb"
     
     async def execute(
         self,
@@ -31,7 +32,7 @@ class AbuseIPDBModule(BaseOSINTModule):
         """Execute AbuseIPDB check"""
         results = []
         
-        api_key = os.getenv('ABUSEIPDB_API_KEY')
+        api_key = config.get('api_key') or os.getenv('ABUSEIPDB_API_KEY')
         if not api_key:
             return results
         

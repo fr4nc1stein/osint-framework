@@ -18,6 +18,7 @@ class VirusTotalDomainModule(BaseOSINTModule):
     ACCEPTS: ClassVar[List[str]] = ["domain"]
     REQUIRES_API_KEY: ClassVar[bool] = True
     API_KEY_ENV_VAR: ClassVar[str] = "VIRUSTOTAL_API_KEY"
+    PROVIDER_ID: ClassVar[str] = "virustotal"
     
     # Rate limiting (VirusTotal free tier: 4 requests/minute)
     RATE_LIMIT_API: ClassVar[str] = "virustotal"
@@ -33,7 +34,7 @@ class VirusTotalDomainModule(BaseOSINTModule):
     ) -> List[DiscoveryResult]:
         """Execute VirusTotal domain lookup"""
         
-        api_key = os.getenv(self.API_KEY_ENV_VAR)
+        api_key = config.get('api_key') or os.getenv(self.API_KEY_ENV_VAR)
         if not api_key:
             return []
         

@@ -16,12 +16,9 @@ class ShodanLookupModule(BaseOSINTModule):
     DESCRIPTION = "Get open ports, services, and vulnerabilities for an IP"
     CATEGORY = "ip"
     ACCEPTS = ["ip"]
-    REQUIRES_KEY = True
-    
-    def validate_config(self, config: dict) -> bool:
-        """Validate Shodan API key is present"""
-        api_key = os.getenv("SHODAN_API_KEY")
-        return bool(api_key)
+    REQUIRES_API_KEY = True
+    API_KEY_ENV_VAR = "SHODAN_API_KEY"
+    PROVIDER_ID = "shodan"
     
     async def execute(
         self,
@@ -32,12 +29,12 @@ class ShodanLookupModule(BaseOSINTModule):
     ) -> List[DiscoveryResult]:
         """Execute Shodan IP lookup"""
         
-        api_key = os.getenv("SHODAN_API_KEY")
+        api_key = config.get('api_key') or os.getenv("SHODAN_API_KEY")
         if not api_key:
             return []
-        
+
         discoveries = []
-        
+
         try:
             url = f"https://api.shodan.io/shodan/host/{target}"
             params = {"key": api_key}

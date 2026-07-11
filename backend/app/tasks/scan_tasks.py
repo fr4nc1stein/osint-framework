@@ -12,6 +12,7 @@ from app.services.graph_service import GraphService
 from app.services.cache_service import CacheService
 from app.services.rate_limiter import check_api_rate_limit
 from app.services.auto_linker import AutoLinkerService
+from app.services.credentials import get_api_key
 
 
 async def get_db_session() -> AsyncSession:
@@ -230,26 +231,39 @@ async def run_scan_task(
                     f"Retry after {limit_info.get('retry_after', 'unknown')} seconds"
                 )
         
+        # Build credential config — DB first, env fallback handled inside get_api_key
+        cred_config = {}
+        provider_id = getattr(module, 'PROVIDER_ID', None)
+        if provider_id:
+            api_key = await get_api_key(provider_id, db)
+            if api_key:
+                cred_config['api_key'] = api_key
+            # Tomba also needs a secret key
+            if provider_id == 'tomba':
+                import os
+                secret = os.getenv('TOMBA_SECRET_KEY')
+                if secret:
+                    cred_config['secret_key'] = secret
+
         # Initialize cache service
         cache_service = CacheService()
-        
+
         # Execute module with caching
         if hasattr(module, 'execute_with_cache'):
             discoveries = await module.execute_with_cache(
                 target=target,
                 kind=kind,
                 http_client=ctx['http_client'],
-                config={},
+                config=cred_config,
                 cache_service=cache_service,
                 use_cache=True
             )
         else:
-            # Fallback to regular execute
             discoveries = await module.execute(
                 target=target,
                 kind=kind,
                 http_client=ctx['http_client'],
-                config={}
+                config=cred_config
             )
         
         # Process discoveries and build graph

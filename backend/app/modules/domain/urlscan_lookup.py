@@ -17,6 +17,7 @@ class URLScanModule(BaseOSINTModule):
     CATEGORY: ClassVar[str] = "domain"
     ACCEPTS: ClassVar[List[str]] = ["domain", "url"]
     REQUIRES_API_KEY: ClassVar[bool] = False  # Public API available
+    PROVIDER_ID: ClassVar[str] = "urlscan"
     
     # URLScan rate limit: 1 request per 2 seconds
     RATE_LIMIT_API: ClassVar[str] = "urlscan"
