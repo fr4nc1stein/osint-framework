@@ -14,6 +14,7 @@ export const api = {
   // Health & Stats
   health: () => apiClient.get('/health'),
   getStats: () => apiClient.get('/api/v1/stats'),
+  getSetupStatus: () => apiClient.get('/api/v1/setup/status'),
   search: (q) => apiClient.get('/api/v1/search', { params: { q } }),
 
   // Modules

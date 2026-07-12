@@ -1,4 +1,5 @@
 """Stats & Search API"""
+import os
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -8,6 +9,9 @@ from app.models.case import Case
 from app.models.scan import Scan
 from app.models.indicator import Indicator
 from app.models.report import Report
+from app.models.integration_credential import IntegrationCredential
+from app.models.ai_setting import AISetting
+from app.services.credentials import PROVIDER_ENV_MAP
 
 router = APIRouter()
 
@@ -75,6 +79,48 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
             }
             for c in recent_cases
         ],
+    }
+
+
+@router.get("/setup/status")
+async def get_setup_status(db: AsyncSession = Depends(get_db)):
+    """Return first-run setup status — which providers are configured and from where."""
+    # Integration credentials in DB
+    result = await db.execute(
+        select(IntegrationCredential).where(IntegrationCredential.encrypted_key.isnot(None))
+    )
+    db_creds = result.scalars().all()
+    db_providers = {c.provider for c in db_creds if c.enabled}
+
+    # Keys available in env
+    env_providers = {p for p, env_var in PROVIDER_ENV_MAP.items() if os.getenv(env_var)}
+
+    # Providers in env but not yet saved to DB
+    importable = sorted(env_providers - db_providers)
+
+    # AI setting
+    ai_result = await db.execute(
+        select(AISetting).where(AISetting.is_default == True)
+    )
+    ai_setting = ai_result.scalar_one_or_none()
+    ai_configured_db = bool(ai_setting and (ai_setting.encrypted_api_key or ai_setting.provider == "ollama"))
+    ai_configured_env = bool(
+        os.getenv("ANTHROPIC_API_KEY") or
+        os.getenv("OPENAI_API_KEY") or
+        os.getenv("AI_PROVIDER") == "ollama"
+    )
+
+    needs_setup = len(db_providers) == 0 and not ai_configured_db
+
+    return {
+        "needs_setup":        needs_setup,
+        "integrations_in_db": len(db_providers),
+        "integrations_in_env":len(env_providers),
+        "importable_count":   len(importable),
+        "importable":         importable,
+        "ai_configured_db":   ai_configured_db,
+        "ai_configured_env":  ai_configured_env,
+        "ai_source":          "db" if ai_configured_db else ("env_fallback" if ai_configured_env else "unconfigured"),
     }
 
 
