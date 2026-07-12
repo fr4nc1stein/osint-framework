@@ -97,8 +97,9 @@ async def _test_provider(provider: str, api_key: str) -> tuple[str, str]:
                 return "fail", f"HTTP {r.status_code}"
 
             elif provider == "tomba":
+                secret = os.getenv("TOMBA_SECRET_KEY", "")
                 r = await client.get("https://api.tomba.io/v1/me",
-                                     headers={"X-Tomba-Key": api_key})
+                                     headers={"X-Tomba-Key": api_key, "X-Tomba-Secret": secret})
                 if r.status_code == 200:
                     return "ok", "Connected successfully"
                 return "fail", f"HTTP {r.status_code}"
