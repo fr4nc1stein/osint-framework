@@ -71,8 +71,11 @@ export const api = {
   importEnvIntegrations: () => apiClient.post('/api/v1/integrations/import-env'),
 
   // AI
-  getAiSettings: () => apiClient.get('/api/v1/ai/settings'),
-  analyzeWithAi: (data) => apiClient.post('/api/v1/ai/analyze', data),
+  getAiSettings:  () => apiClient.get('/api/v1/ai/settings'),
+  getAiProviders: () => apiClient.get('/api/v1/ai/providers'),
+  saveAiSettings: (data) => apiClient.put('/api/v1/ai/settings', data),
+  testAiSettings: () => apiClient.post('/api/v1/ai/test'),
+  analyzeWithAi:  (data) => apiClient.post('/api/v1/ai/analyze', data),
 };
 
 export default apiClient;
