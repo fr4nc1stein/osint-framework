@@ -38,6 +38,15 @@ export const api = {
   createCaseRelationship: (caseId, data) => apiClient.post(`/api/v1/cases/${caseId}/relationships`, data),
   updateCaseRelationship: (caseId, relationshipId, data) => apiClient.put(`/api/v1/cases/${caseId}/relationships/${relationshipId}`, data),
   deleteCaseRelationship: (caseId, relationshipId) => apiClient.delete(`/api/v1/cases/${caseId}/relationships/${relationshipId}`),
+  getCaseEvidence: (caseId, params) => apiClient.get(`/api/v1/cases/${caseId}/evidence`, { params }),
+  createCaseEvidence: (caseId, data) => apiClient.post(`/api/v1/cases/${caseId}/evidence`, data),
+  uploadCaseEvidence: (caseId, data) => apiClient.post(`/api/v1/cases/${caseId}/evidence/upload`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  deleteCaseEvidence: (caseId, evidenceId) => apiClient.delete(`/api/v1/cases/${caseId}/evidence/${evidenceId}`),
+  evidenceDownloadUrl: (caseId, evidenceId) => `/api/v1/cases/${caseId}/evidence/${evidenceId}/download`,
+  evidenceThumbnailUrl: (caseId, evidenceId) => `/api/v1/cases/${caseId}/evidence/${evidenceId}/thumbnail`,
+  evidencePreviewUrl: (caseId, evidenceId) => `/api/v1/cases/${caseId}/evidence/${evidenceId}/preview`,
 
   // Case Notes
   getCaseNotes: (caseId) => apiClient.get(`/api/v1/cases/${caseId}/notes`),

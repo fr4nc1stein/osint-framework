@@ -37,6 +37,10 @@ pyaes==1.6.1
 # Report rendering
 markdown==3.6
 
+# Evidence storage and previews
+minio==7.2.7
+pillow==10.3.0
+
 # Development (optional - install separately for testing)
 # pytest==8.2.0
 # pytest-asyncio==0.23.6

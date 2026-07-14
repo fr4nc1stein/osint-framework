@@ -4,9 +4,11 @@ import { computed, ref } from 'vue'
 const props = defineProps({
   node:      { type: Object, default: null },
   graphData: { type: Object, default: null },
+  evidenceItems: { type: Array, default: () => [] },
+  evidenceLoading: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['close', 'scan-from-node'])
+const emit = defineEmits(['close', 'scan-from-node', 'attach-evidence', 'preview-evidence', 'download-evidence'])
 
 const copied = ref(false)
 
@@ -23,6 +25,17 @@ function linkedNode(edge) {
   return nodes.value.find(n => n.id === id)
 }
 
+function evidenceTargetForEdge(edge) {
+  const linked = linkedNode(edge)
+  const targetType = edge.source_type === 'manual' ? 'relationship' : 'graph_edge'
+  return {
+    ...edge,
+    __evidence_target_type: targetType,
+    __evidence_target_id: edge.id,
+    __evidence_label: `${(edge.relationship || edge.label || targetType).replace(/_/g, ' ')} · ${linked?.label || linked?.value || 'related node'}`,
+  }
+}
+
 function confColor(c) {
   if (c >= 0.85) return 'text-emerald-400'
   if (c >= 0.6)  return 'text-amber-400'
@@ -32,6 +45,12 @@ function confColor(c) {
 function fmtDate(d) {
   if (!d) return '—'
   return new Date(d).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function fmtBytes(size) {
+  if (!size) return ''
+  if (size < 1024 * 1024) return `${Math.ceil(size / 1024)} KB`
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
 async function copyValue() {
@@ -150,6 +169,70 @@ const KIND_BADGE = {
         </div>
       </div>
 
+      <!-- Evidence -->
+      <div class="px-4 py-3 border-b" style="border-color: var(--border)">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <p class="text-xs font-semibold uppercase tracking-wider" style="color: var(--text-muted)">
+            Evidence
+          </p>
+          <span class="badge text-[10px]" :class="evidenceItems.length ? 'badge-blue' : 'badge-slate'">
+            {{ evidenceLoading ? '…' : evidenceItems.length }}
+          </span>
+        </div>
+
+        <div v-if="evidenceLoading" class="text-xs py-2" style="color: var(--text-muted)">
+          Loading evidence…
+        </div>
+
+        <div v-else-if="evidenceItems.length === 0" class="space-y-2">
+          <p class="text-xs" style="color: var(--text-muted)">No evidence linked to this node.</p>
+          <button class="btn-secondary w-full text-xs" @click="emit('attach-evidence', node)">
+            Attach evidence
+          </button>
+        </div>
+
+        <div v-else class="space-y-2">
+          <div
+            v-for="item in evidenceItems"
+            :key="item.id"
+            class="rounded-lg p-2.5 border space-y-2"
+            style="background-color: var(--bg-primary); border-color: var(--border)"
+          >
+            <img
+              v-if="item.thumbnail_url"
+              :src="item.thumbnail_url"
+              :alt="item.title"
+              class="w-full h-24 object-cover rounded border"
+              style="border-color: var(--border); background-color: var(--bg-tertiary)"
+            />
+            <div class="min-w-0">
+              <p class="text-xs font-medium truncate" style="color: var(--text-primary)" :title="item.title">
+                {{ item.title }}
+              </p>
+              <div class="flex flex-wrap gap-1 mt-1">
+                <span class="badge badge-blue text-[9px]">{{ item.evidence_type }}</span>
+                <span v-if="item.file_size" class="badge badge-slate text-[9px]">{{ fmtBytes(item.file_size) }}</span>
+              </div>
+            </div>
+            <p v-if="item.description" class="text-[10px] line-clamp-2" style="color: var(--text-secondary)">
+              {{ item.description }}
+            </p>
+            <p class="text-[10px]" style="color: var(--text-muted)">Added {{ fmtDate(item.created_at) }}</p>
+            <div class="flex gap-2">
+              <button v-if="item.preview_url" class="btn-ghost text-[10px] px-0" @click="emit('preview-evidence', item)">
+                Preview
+              </button>
+              <button v-if="item.download_url" class="btn-ghost text-[10px] px-0" @click="emit('download-evidence', item)">
+                Download
+              </button>
+              <button class="btn-ghost text-[10px] px-0 ml-auto" @click="emit('attach-evidence', node)">
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Connections -->
       <div class="px-4 py-3">
         <p class="text-xs font-semibold uppercase tracking-wider mb-2" style="color: var(--text-muted)">
@@ -187,6 +270,9 @@ const KIND_BADGE = {
               </svg>
               {{ edge.source_module }}
             </div>
+            <button class="btn-ghost text-[10px] px-0" @click="emit('attach-evidence', evidenceTargetForEdge(edge))">
+              Attach evidence
+            </button>
           </div>
         </div>
       </div>
@@ -194,6 +280,13 @@ const KIND_BADGE = {
 
     <!-- Scan from node action -->
     <div class="shrink-0 px-4 py-3 border-t" style="border-color: var(--border)">
+      <button class="btn-secondary w-full flex items-center justify-center gap-2 text-sm mb-2"
+        @click="emit('attach-evidence', node)">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 1 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.82-2.82l8.48-8.49"/>
+        </svg>
+        Attach evidence
+      </button>
       <button class="btn-primary w-full flex items-center justify-center gap-2 text-sm"
         @click="emit('scan-from-node', node)">
         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">

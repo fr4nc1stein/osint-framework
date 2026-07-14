@@ -31,6 +31,37 @@ services:
       timeout: 3s
       retries: 5
 
+  minio:
+    image: minio/minio:latest
+    container_name: osif_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: osif_minio
+      MINIO_ROOT_PASSWORD: osif_minio_password
+    ports:
+      - "9100:9000"
+      - "9101:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: osif_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set osif http://minio:9000 osif_minio osif_minio_password;
+      mc mb --ignore-existing osif/osif-evidence;
+      mc anonymous set none osif/osif-evidence;
+      "
+
   backend:
     build:
       context: ./backend
@@ -50,6 +81,13 @@ services:
       API_PORT: 6000
       DEBUG: "true"
       CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000"]'
+      EVIDENCE_STORAGE_BACKEND: s3
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_BUCKET: osif-evidence
+      S3_ACCESS_KEY: osif_minio
+      S3_SECRET_KEY: osif_minio_password
+      S3_REGION: us-east-1
+      S3_FORCE_PATH_STYLE: "true"
     volumes:
       - ./backend:/app
     depends_on:
@@ -57,6 +95,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   worker:
@@ -111,3 +151,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  minio_data:

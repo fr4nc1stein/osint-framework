@@ -1,7 +1,7 @@
 # OSIF v2.0 - Phase 3.4 Plan: Skip Tracing, Private Investigation Workspace, Manual Graph, Timeline, Evidence, and Maps
 
 **Date:** 2026-07-14  
-**Status:** Planning  
+**Status:** In Progress — Phase 3.4A and 3.4B complete; Phase 3.4C recommended next
 **Focus:** Extend cases from automated OSINT scan containers into full investigation workspaces for skip tracing and private investigation workflows.
 
 ---
@@ -385,7 +385,9 @@ case_evidence
 - file_mime_type
 - file_size
 - file_sha256
+- storage_backend
 - storage_key
+- thumbnail_storage_key
 - captured_at
 - collected_by
 - chain_of_custody_status
@@ -445,7 +447,7 @@ Image handling requirements:
 - Store SHA-256 hash.
 - Generate thumbnail for UI.
 - Preserve original file.
-- Avoid exposing local filesystem paths to the frontend.
+- Avoid exposing MinIO bucket names, object keys, credentials, presigned URLs, or local filesystem paths to the frontend.
 - Strip or preserve EXIF based on case policy.
 - Show EXIF metadata only when allowed.
 
@@ -457,14 +459,86 @@ Important policy decision:
 
 ### Storage
 
-Phase 3.4 can start with filesystem-backed storage for development:
+Phase 3.4B should use MinIO as the primary evidence file backend in Docker.
+
+Recommended Docker services:
+
+- `minio`: S3-compatible object storage for evidence files.
+- `minio-init`: one-shot setup container using `minio/mc` to create the evidence bucket and lock down anonymous access.
+- `backend`: the only application service that talks to MinIO.
+- `frontend`: talks only to the backend evidence API, never to MinIO directly.
+
+Recommended bucket:
 
 ```text
-storage/cases/{case_id}/evidence/{evidence_id}/original
-storage/cases/{case_id}/evidence/{evidence_id}/thumbnail
+osif-evidence
 ```
 
-Future production options:
+Recommended object key layout:
+
+```text
+cases/{case_id}/evidence/{evidence_id}/original/{safe_filename}
+cases/{case_id}/evidence/{evidence_id}/thumbnail/{safe_filename}
+cases/{case_id}/evidence/{evidence_id}/derived/{safe_filename}
+```
+
+Recommended backend configuration:
+
+```text
+EVIDENCE_STORAGE_BACKEND=s3
+S3_ENDPOINT_URL=http://minio:9000
+S3_BUCKET=osif-evidence
+S3_ACCESS_KEY=...
+S3_SECRET_KEY=...
+S3_REGION=us-east-1
+S3_FORCE_PATH_STYLE=true
+```
+
+The MinIO console can remain available for administrators, but application setup should not require a person to open the console. Bucket creation should be automated by the Docker setup.
+
+### Backend-Only File Access
+
+The backend must be the only service that reads from or writes to MinIO.
+
+Frontend-facing records should expose backend API paths, not MinIO paths:
+
+```text
+GET /api/v1/cases/{case_id}/evidence/{evidence_id}
+GET /api/v1/cases/{case_id}/evidence/{evidence_id}/download
+GET /api/v1/cases/{case_id}/evidence/{evidence_id}/thumbnail
+GET /api/v1/cases/{case_id}/evidence/{evidence_id}/preview
+```
+
+The API response can include fields like:
+
+```text
+download_url: /api/v1/cases/{case_id}/evidence/{evidence_id}/download
+thumbnail_url: /api/v1/cases/{case_id}/evidence/{evidence_id}/thumbnail
+preview_url: /api/v1/cases/{case_id}/evidence/{evidence_id}/preview
+```
+
+The API response should not include:
+
+- MinIO endpoint URL.
+- Bucket name.
+- Raw object key when not needed by the UI.
+- S3 credentials.
+- Presigned MinIO URL unless a later deployment explicitly chooses that pattern.
+
+Preferred implementation:
+
+- Browser uploads evidence to the backend.
+- Backend validates file type and size.
+- Backend calculates SHA-256 while streaming or before upload.
+- Backend writes original file to MinIO.
+- Backend generates sanitized thumbnails/previews when supported.
+- Backend writes thumbnails/previews to MinIO.
+- Backend stores object keys and metadata in PostgreSQL.
+- Browser downloads or previews evidence through backend routes.
+
+This design keeps authorization, audit logging, chain-of-custody checks, and report-export filtering inside the backend.
+
+Future production options can still use the same abstraction:
 
 - S3-compatible object storage
 - encrypted local volume
@@ -1005,61 +1079,66 @@ Before production use, legal and policy requirements should be reviewed for the 
 
 ## Implementation Order
 
-### Step 1: Manual Entities And Relationships
+### Step 1: Manual Entities And Relationships — Done
 
-- Add case entity model/schema/migration.
-- Add case relationship model/schema/migration.
-- Add CRUD endpoints.
-- Add manual node creation UI.
-- Add connect existing nodes UI.
-- Add connected-node creation flow.
-- Update graph endpoint to include manual nodes and edges.
+- [x] Add case entity model/schema/migration.
+- [x] Add case relationship model/schema/migration.
+- [x] Add CRUD endpoints.
+- [x] Add manual node creation UI.
+- [x] Add connect existing nodes UI.
+- [x] Add connected-node creation flow.
+- [x] Update graph endpoint to include manual nodes and edges.
 
-### Step 2: Evidence Attachments
+### Step 2: Evidence Attachments — Done
 
-- Add evidence model and evidence link model.
-- Add upload endpoint.
-- Add URL/note evidence creation.
-- Add file hash generation.
-- Add image thumbnail generation.
-- Add evidence panel on nodes and relationships.
+- [x] Add evidence model and evidence link model.
+- [x] Add MinIO service to Docker Compose.
+- [x] Add MinIO init service/script to create the evidence bucket automatically.
+- [x] Add backend storage service abstraction with MinIO/S3 implementation.
+- [x] Add upload endpoint.
+- [x] Add backend download, thumbnail, and preview endpoints.
+- [x] Add URL/note evidence creation.
+- [x] Add file hash generation.
+- [x] Add image thumbnail generation.
+- [x] Add evidence panel on nodes and relationships.
+- [x] Show linked evidence indication and preview/download actions in the graph node sidebar.
 
-### Step 3: Timeline
+### Step 3: Timeline — Recommended Next
 
-- Add timeline event model.
-- Add timeline link model.
-- Add timeline CRUD endpoints.
-- Add timeline tab.
-- Add create timeline event from node/evidence/scan result.
+- [ ] Add timeline event model.
+- [ ] Add timeline link model.
+- [ ] Add timeline CRUD endpoints.
+- [ ] Add timeline tab.
+- [ ] Add create timeline event from node/evidence/scan result.
 
 ### Step 4: Map View
 
-- Add location model or normalized location properties.
-- Add map endpoint.
-- Add map tab.
-- Add manual latitude/longitude support.
-- Add marker filtering.
-- Add timeline and graph links from map markers.
+- [ ] Add location model or normalized location properties.
+- [ ] Add map endpoint.
+- [ ] Add map tab.
+- [ ] Add manual latitude/longitude support.
+- [ ] Add marker filtering.
+- [ ] Add timeline and graph links from map markers.
 
 ### Step 5: Leads And Review
 
-- Add lead status to manual and scan-derived objects.
-- Add review queue.
-- Add promote/reject/merge actions.
-- Keep automated scan results as leads until confirmed.
+- [ ] Add lead status to manual and scan-derived objects.
+- [ ] Add review queue.
+- [ ] Add promote/reject/merge actions.
+- [ ] Keep automated scan results as leads until confirmed.
 
 ### Step 6: Scan From Node
 
-- Add node action menu.
-- Map entity types to available scan workflows.
-- Create scan runs from selected node values.
-- Write scan results back as leads with source metadata.
+- [ ] Add node action menu.
+- [ ] Map entity types to available scan workflows.
+- [ ] Create scan runs from selected node values.
+- [ ] Write scan results back as leads with source metadata.
 
 ### Step 7: Dossier And PI Reports
 
-- Add subject dossier tab.
-- Add report sections for timeline, evidence, locations, and verified relationships.
-- Add include/exclude controls for sensitive evidence.
+- [ ] Add subject dossier tab.
+- [ ] Add report sections for timeline, evidence, locations, and verified relationships.
+- [ ] Add include/exclude controls for sensitive evidence.
 
 ---
 
@@ -1093,7 +1172,8 @@ Before production use, legal and policy requirements should be reviewed for the 
 
 - File upload rejects unsafe types.
 - File download requires case access.
-- Evidence APIs do not expose local filesystem paths.
+- Evidence APIs do not expose MinIO credentials, bucket internals, object storage URLs, or local filesystem paths.
+- Frontend evidence downloads and previews go through backend API paths only.
 - Deleted evidence links do not delete the original evidence unless explicitly requested.
 - External geocoding cannot run silently.
 - Sensitive evidence is excluded from reports unless selected.

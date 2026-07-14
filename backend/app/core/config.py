@@ -58,5 +58,15 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # Evidence storage (Phase 3.4B)
+    EVIDENCE_STORAGE_BACKEND: str = "s3"
+    EVIDENCE_MAX_UPLOAD_BYTES: int = 25 * 1024 * 1024
+    S3_ENDPOINT_URL: str = "http://localhost:9000"
+    S3_BUCKET: str = "osif-evidence"
+    S3_ACCESS_KEY: str = "osif_minio"
+    S3_SECRET_KEY: str = "osif_minio_password"
+    S3_REGION: str = "us-east-1"
+    S3_FORCE_PATH_STYLE: bool = True
+
 
 settings = Settings()

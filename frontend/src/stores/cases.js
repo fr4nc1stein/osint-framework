@@ -14,6 +14,8 @@ export const useCasesStore = defineStore('cases', {
     caseEntitiesCaseId: null,
     caseRelationships: [],
     caseRelationshipsCaseId: null,
+    caseEvidence: [],
+    caseEvidenceCaseId: null,
     caseNotes: [],
     caseNotesCaseId: null,
     caseReports: [],
@@ -50,6 +52,8 @@ export const useCasesStore = defineStore('cases', {
           this.caseEntitiesCaseId = null
           this.caseRelationships = []
           this.caseRelationshipsCaseId = null
+          this.caseEvidence = []
+          this.caseEvidenceCaseId = null
           this.caseNotes = []
           this.caseNotesCaseId = null
           this.caseReports = []
@@ -152,6 +156,32 @@ export const useCasesStore = defineStore('cases', {
       await api.deleteCaseRelationship(caseId, relationshipId)
       this.caseRelationships = this.caseRelationships.filter(r => r.id !== relationshipId)
       await this.fetchCaseGraph(caseId)
+    },
+
+    async fetchCaseEvidence(caseId, params = undefined) {
+      const { data } = await api.getCaseEvidence(caseId, params)
+      if (!params?.target_type && !params?.target_id) {
+        this.caseEvidence = data
+        this.caseEvidenceCaseId = caseId
+      }
+      return data
+    },
+
+    async createCaseEvidence(caseId, payload) {
+      const { data } = await api.createCaseEvidence(caseId, payload)
+      this.caseEvidence.unshift(data)
+      return data
+    },
+
+    async uploadCaseEvidence(caseId, formData) {
+      const { data } = await api.uploadCaseEvidence(caseId, formData)
+      this.caseEvidence.unshift(data)
+      return data
+    },
+
+    async deleteCaseEvidence(caseId, evidenceId) {
+      await api.deleteCaseEvidence(caseId, evidenceId)
+      this.caseEvidence = this.caseEvidence.filter(e => e.id !== evidenceId)
     },
 
     async fetchCaseNotes(caseId) {

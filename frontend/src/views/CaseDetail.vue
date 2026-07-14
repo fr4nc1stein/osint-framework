@@ -15,7 +15,7 @@ const casesStore = useCasesStore()
 
 const caseId    = computed(() => route.params.id)
 const activeTab = ref('scans')
-const tabs      = ['scans', 'graph', 'timeline', 'notes', 'reports']
+const tabs      = ['scans', 'graph', 'timeline', 'evidence', 'notes', 'reports']
 
 const showScanModal  = ref(false)
 const showEditModal  = ref(false)
@@ -28,9 +28,16 @@ const showNodeScan   = ref(false)
 const nodeSuggestedModules = ref([])
 const showEntityModal = ref(false)
 const showRelationshipModal = ref(false)
+const showEvidenceModal = ref(false)
 const entityRelationNode = ref(null)
+const evidenceTarget = ref(null)
 const entityForm = ref(defaultEntityForm())
 const relationshipForm = ref(defaultRelationshipForm())
+const evidenceForm = ref(defaultEvidenceForm())
+const evidenceFile = ref(null)
+const evidenceError = ref('')
+const selectedNodeEvidence = ref([])
+const selectedNodeEvidenceLoading = ref(false)
 
 onMounted(async () => {
   await loadCase(caseId.value)
@@ -52,6 +59,7 @@ watch(
 async function loadCase(id) {
   await casesStore.fetchCase(id)
   await casesStore.fetchCaseScans(id)
+  await casesStore.fetchCaseEvidence(id)
   await casesStore.fetchCaseNotes(id)
   await casesStore.fetchCaseReports(id)
 }
@@ -64,6 +72,7 @@ const currentCase = computed(() => casesStore.currentCase)
 const scans       = computed(() => casesStore.caseScans)
 const notes       = computed(() => casesStore.caseNotes)
 const reports     = computed(() => casesStore.caseReports)
+const evidence    = computed(() => casesStore.caseEvidence)
 const caseGraph   = computed(() => casesStore.caseGraph)
 const nodeParentScanId = computed(() => resolveNodeParentScanId(scanFromNode.value))
 const graphNodes = computed(() => caseGraph.value?.nodes ?? [])
@@ -91,6 +100,9 @@ const timeline = computed(() => {
   for (const r of reports.value) {
     events.push({ time: r.generated_at, type: 'report', label: 'Report generated', detail: r.title })
   }
+  for (const item of evidence.value) {
+    events.push({ time: item.created_at, type: 'evidence', label: 'Evidence added', detail: item.title })
+  }
   for (const n of notes.value) {
     events.push({ time: n.created_at, type: 'note', label: 'Note added', detail: n.content.slice(0, 60) + (n.content.length > 60 ? '…' : '') })
   }
@@ -113,6 +125,9 @@ async function switchTab(tab) {
   activeTab.value = tab
   if (tab === 'graph' && casesStore.caseGraphCaseId !== currentCaseId()) {
     await casesStore.fetchCaseGraph(currentCaseId())
+  }
+  if (tab === 'evidence' && casesStore.caseEvidenceCaseId !== currentCaseId()) {
+    await casesStore.fetchCaseEvidence(currentCaseId())
   }
 }
 
@@ -154,6 +169,13 @@ function previewReport(r) {
 
 function onNodeSelect(node) {
   selectedNode.value = node
+  loadSelectedNodeEvidence(node)
+}
+
+function closeSelectedNode() {
+  selectedNode.value = null
+  selectedNodeEvidence.value = []
+  selectedNodeEvidenceLoading.value = false
 }
 
 function defaultEntityForm() {
@@ -181,8 +203,66 @@ function defaultRelationshipForm() {
   }
 }
 
+function defaultEvidenceForm() {
+  return {
+    mode: 'file',
+    title: '',
+    description: '',
+    evidence_type: 'document',
+    source_url: '',
+    collected_by: '',
+    relationship_note: '',
+  }
+}
+
 function graphNodeType(node) {
   return node?.graph_node_type ?? (node?.source_type === 'scan' ? 'indicator' : 'entity')
+}
+
+function graphNodeLabel(node) {
+  if (!node) return ''
+  if (node.__evidence_label) return node.__evidence_label
+  return `${node.kind || graphNodeType(node)} · ${node.label || node.value}`
+}
+
+function evidenceTargetType(target) {
+  return target?.__evidence_target_type || graphNodeType(target)
+}
+
+function evidenceTargetId(target) {
+  return target?.__evidence_target_id || target?.id
+}
+
+async function loadSelectedNodeEvidence(node = selectedNode.value) {
+  selectedNodeEvidence.value = []
+  if (!node) return
+
+  selectedNodeEvidenceLoading.value = true
+  const targetType = graphNodeType(node)
+  const targetId = node.id
+  try {
+    const items = await casesStore.fetchCaseEvidence(currentCaseId(), {
+      target_type: targetType,
+      target_id: targetId,
+    })
+    if (selectedNode.value?.id === targetId) {
+      selectedNodeEvidence.value = items
+    }
+  } catch {
+    if (selectedNode.value?.id === targetId) {
+      selectedNodeEvidence.value = []
+    }
+  } finally {
+    if (selectedNode.value?.id === targetId) {
+      selectedNodeEvidenceLoading.value = false
+    }
+  }
+}
+
+function isSelectedNodeTarget(target) {
+  if (!selectedNode.value || !target) return false
+  return evidenceTargetType(target) === graphNodeType(selectedNode.value)
+    && evidenceTargetId(target) === selectedNode.value.id
 }
 
 function nodeById(id) {
@@ -307,6 +387,96 @@ async function openScanFromNode(node) {
   }
   showNodeScan.value = true
 }
+
+function openEvidenceModal(target = null) {
+  evidenceTarget.value = target
+  evidenceForm.value = defaultEvidenceForm()
+  evidenceFile.value = null
+  evidenceError.value = ''
+  if (target) {
+    evidenceForm.value.title = `Evidence for ${target.label || target.value}`
+  }
+  showEvidenceModal.value = true
+}
+
+function onEvidenceFileChange(event) {
+  evidenceFile.value = event.target.files?.[0] || null
+}
+
+function inferEvidenceType(file) {
+  if (!file) return evidenceForm.value.evidence_type
+  if (file.type?.startsWith('image/')) return 'image'
+  if (file.type === 'application/pdf') return 'pdf'
+  if (file.type?.startsWith('text/')) return 'text'
+  return evidenceForm.value.evidence_type || 'document'
+}
+
+async function submitEvidence() {
+  evidenceError.value = ''
+  const target = evidenceTarget.value
+  try {
+    if (evidenceForm.value.mode === 'file') {
+      if (!evidenceFile.value) {
+        evidenceError.value = 'Select a file to upload.'
+        return
+      }
+      const formData = new FormData()
+      formData.append('title', evidenceForm.value.title)
+      formData.append('evidence_type', inferEvidenceType(evidenceFile.value))
+      formData.append('source_type', 'manual')
+      if (evidenceForm.value.description) formData.append('description', evidenceForm.value.description)
+      if (evidenceForm.value.source_url) formData.append('source_url', evidenceForm.value.source_url)
+      if (evidenceForm.value.collected_by) formData.append('collected_by', evidenceForm.value.collected_by)
+      if (target) {
+        formData.append('target_type', evidenceTargetType(target))
+        formData.append('target_id', evidenceTargetId(target))
+        if (evidenceForm.value.relationship_note) formData.append('relationship_note', evidenceForm.value.relationship_note)
+      }
+      formData.append('file', evidenceFile.value)
+      await casesStore.uploadCaseEvidence(currentCaseId(), formData)
+    } else {
+      const payload = {
+        title: evidenceForm.value.title,
+        description: evidenceForm.value.description || null,
+        evidence_type: evidenceForm.value.mode === 'url' ? 'url' : 'note',
+        source_type: 'manual',
+        source_url: evidenceForm.value.mode === 'url' ? evidenceForm.value.source_url : null,
+        collected_by: evidenceForm.value.collected_by || null,
+      }
+      if (target) {
+        payload.link = {
+          target_type: evidenceTargetType(target),
+          target_id: evidenceTargetId(target),
+          relationship_note: evidenceForm.value.relationship_note || null,
+        }
+      }
+      await casesStore.createCaseEvidence(currentCaseId(), payload)
+    }
+    showEvidenceModal.value = false
+    await casesStore.fetchCaseEvidence(currentCaseId())
+    if (isSelectedNodeTarget(target)) {
+      await loadSelectedNodeEvidence(selectedNode.value)
+    }
+    evidenceTarget.value = null
+  } catch (e) {
+    evidenceError.value = e.response?.data?.detail || e.message
+  }
+}
+
+function downloadEvidence(item) {
+  window.open(api.evidenceDownloadUrl(currentCaseId(), item.id), '_blank')
+}
+
+function previewEvidence(item) {
+  window.open(api.evidencePreviewUrl(currentCaseId(), item.id), '_blank')
+}
+
+async function deleteEvidence(item) {
+  await casesStore.deleteCaseEvidence(currentCaseId(), item.id)
+  if (selectedNode.value) {
+    await loadSelectedNodeEvidence(selectedNode.value)
+  }
+}
 </script>
 
 <template>
@@ -391,6 +561,7 @@ async function openScanFromNode(node) {
             @click="switchTab(tab)">
             {{ tab }}
             <span v-if="tab === 'scans'  && scans.length"   class="ml-1.5 badge badge-blue">{{ scans.length }}</span>
+            <span v-if="tab === 'evidence' && evidence.length" class="ml-1.5 badge badge-slate">{{ evidence.length }}</span>
             <span v-if="tab === 'notes'  && notes.length"   class="ml-1.5 badge badge-slate">{{ notes.length }}</span>
             <span v-if="tab === 'reports'&& reports.length" class="ml-1.5 badge badge-slate">{{ reports.length }}</span>
           </button>
@@ -457,8 +628,13 @@ async function openScanFromNode(node) {
         <GraphNodePanel
           :node="selectedNode"
           :graph-data="caseGraph"
-          @close="selectedNode = null"
+          :evidence-items="selectedNodeEvidence"
+          :evidence-loading="selectedNodeEvidenceLoading"
+          @close="closeSelectedNode"
           @scan-from-node="openScanFromNode"
+          @attach-evidence="openEvidenceModal"
+          @preview-evidence="previewEvidence"
+          @download-evidence="downloadEvidence"
         />
       </div>
 
@@ -526,6 +702,65 @@ async function openScanFromNode(node) {
               <p class="text-sm font-medium" style="color: var(--text-primary)">{{ ev.label }}</p>
               <p class="text-sm" style="color: var(--text-secondary)">{{ ev.detail }}</p>
               <p class="text-xs mt-0.5" style="color: var(--text-muted)">{{ fmtDate(ev.time) }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Evidence tab -->
+        <div v-if="activeTab === 'evidence'">
+          <div class="flex items-center justify-between mb-4 gap-3">
+            <div>
+              <h2 class="text-lg font-semibold" style="color: var(--text-primary)">Evidence</h2>
+              <p class="text-sm" style="color: var(--text-muted)">Files, source URLs, and analyst observations for this case.</p>
+            </div>
+            <button class="btn-primary flex items-center gap-2" @click="openEvidenceModal()">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              Add Evidence
+            </button>
+          </div>
+
+          <div v-if="evidence.length === 0" class="text-center py-12" style="color: var(--text-muted)">
+            No evidence has been added yet.
+          </div>
+
+          <div v-else class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div v-for="item in evidence" :key="item.id" class="card p-4 flex flex-col gap-3">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h3 class="font-medium truncate" style="color: var(--text-primary)" :title="item.title">{{ item.title }}</h3>
+                  <div class="flex flex-wrap gap-1.5 mt-1">
+                    <span class="badge badge-blue">{{ item.evidence_type }}</span>
+                    <span class="badge badge-slate">{{ item.source_type }}</span>
+                    <span v-if="item.links?.length" class="badge badge-slate">{{ item.links.length }} link{{ item.links.length === 1 ? '' : 's' }}</span>
+                  </div>
+                </div>
+                <button class="btn-ghost text-xs text-red-400 shrink-0" @click="deleteEvidence(item)">Delete</button>
+              </div>
+
+              <img
+                v-if="item.thumbnail_url"
+                :src="item.thumbnail_url"
+                :alt="item.title"
+                class="w-full h-36 object-cover rounded border"
+                style="border-color: var(--border); background-color: var(--bg-primary)"
+              />
+
+              <p v-if="item.description" class="text-sm line-clamp-3" style="color: var(--text-secondary)">{{ item.description }}</p>
+              <a v-if="item.source_url" :href="item.source_url" target="_blank" rel="noopener noreferrer" class="text-xs break-all text-blue-400">
+                {{ item.source_url }}
+              </a>
+
+              <div class="text-xs space-y-1 mt-auto" style="color: var(--text-muted)">
+                <p v-if="item.file_name" class="truncate" :title="item.file_name">{{ item.file_name }}</p>
+                <p v-if="item.file_size">{{ Math.ceil(item.file_size / 1024) }} KB · {{ item.file_mime_type }}</p>
+                <p v-if="item.file_sha256" class="font-mono truncate" :title="item.file_sha256">sha256 {{ item.file_sha256 }}</p>
+                <p>Added {{ fmtDate(item.created_at) }}</p>
+              </div>
+
+              <div class="flex gap-2 pt-1">
+                <button v-if="item.preview_url" class="btn-secondary text-xs" @click="previewEvidence(item)">Preview</button>
+                <button v-if="item.download_url" class="btn-secondary text-xs" @click="downloadEvidence(item)">Download</button>
+              </div>
             </div>
           </div>
         </div>
@@ -761,6 +996,75 @@ async function openScanFromNode(node) {
           <div class="flex justify-end gap-3 pt-2">
             <button type="button" class="btn-secondary" @click="showRelationshipModal = false">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="relationshipForm.from_node_id === relationshipForm.to_node_id">Create Relationship</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- Evidence modal -->
+  <Teleport to="body">
+    <div v-if="showEvidenceModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" @click.self="showEvidenceModal = false">
+      <div class="card p-6 w-full max-w-lg mx-4">
+        <h2 class="text-lg font-semibold mb-1" style="color: var(--text-primary)">Add Evidence</h2>
+        <p v-if="evidenceTarget" class="text-xs mb-4" style="color: var(--text-muted)">
+          Linking to {{ graphNodeLabel(evidenceTarget) }}
+        </p>
+        <form @submit.prevent="submitEvidence" class="space-y-4">
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex items-center gap-2 text-sm rounded border px-3 py-2 cursor-pointer"
+              :style="{ borderColor: evidenceForm.mode === 'file' ? 'rgb(59 130 246)' : 'var(--border)', color: 'var(--text-secondary)' }">
+              <input v-model="evidenceForm.mode" type="radio" value="file" />
+              File
+            </label>
+            <label class="flex items-center gap-2 text-sm rounded border px-3 py-2 cursor-pointer"
+              :style="{ borderColor: evidenceForm.mode === 'url' ? 'rgb(59 130 246)' : 'var(--border)', color: 'var(--text-secondary)' }">
+              <input v-model="evidenceForm.mode" type="radio" value="url" />
+              URL
+            </label>
+            <label class="flex items-center gap-2 text-sm rounded border px-3 py-2 cursor-pointer"
+              :style="{ borderColor: evidenceForm.mode === 'note' ? 'rgb(59 130 246)' : 'var(--border)', color: 'var(--text-secondary)' }">
+              <input v-model="evidenceForm.mode" type="radio" value="note" />
+              Note
+            </label>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Title *</label>
+            <input v-model="evidenceForm.title" class="input" placeholder="Evidence title" required />
+          </div>
+
+          <div v-if="evidenceForm.mode === 'file'">
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">File *</label>
+            <input class="input" type="file" required @change="onEvidenceFileChange" />
+          </div>
+
+          <div v-if="evidenceForm.mode !== 'note'">
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Source URL</label>
+            <input v-model="evidenceForm.source_url" class="input" type="url" placeholder="https://example.com/source" :required="evidenceForm.mode === 'url'" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Description</label>
+            <textarea v-model="evidenceForm.description" class="input h-24 resize-none" placeholder="Context, collection notes, or observation" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Collected By</label>
+              <input v-model="evidenceForm.collected_by" class="input" placeholder="Analyst name" />
+            </div>
+            <div v-if="evidenceTarget">
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Link Note</label>
+              <input v-model="evidenceForm.relationship_note" class="input" placeholder="Why this supports the node" />
+            </div>
+          </div>
+
+          <p v-if="evidenceError" class="text-sm text-red-400">{{ evidenceError }}</p>
+
+          <div class="flex justify-end gap-3 pt-2">
+            <button type="button" class="btn-secondary" @click="showEvidenceModal = false">Cancel</button>
+            <button type="submit" class="btn-primary">Save Evidence</button>
           </div>
         </form>
       </div>

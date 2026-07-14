@@ -8,7 +8,9 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.models.case import Case
+from app.models.evidence import Evidence
 from app.schemas.case import CaseCreate, CaseUpdate, CaseResponse, CaseStatusUpdate
+from app.services.evidence_storage import EvidenceStorageService, get_evidence_storage
 
 router = APIRouter()
 
@@ -133,7 +135,8 @@ async def update_case_status(
 @router.delete("/{case_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_case(
     case_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    storage: EvidenceStorageService = Depends(get_evidence_storage),
 ):
     """Delete case"""
     result = await db.execute(select(Case).where(Case.id == case_id))
@@ -144,6 +147,12 @@ async def delete_case(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Case {case_id} not found"
         )
-    
+    evidence_result = await db.execute(
+        select(Evidence.storage_key, Evidence.thumbnail_storage_key).where(Evidence.case_id == case_id)
+    )
+    for storage_key, thumbnail_storage_key in evidence_result.all():
+        await storage.delete_file(storage_key)
+        await storage.delete_file(thumbnail_storage_key)
+
     await db.delete(case)
     await db.commit()
