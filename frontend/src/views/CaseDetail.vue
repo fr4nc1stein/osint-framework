@@ -26,6 +26,11 @@ const selectedNode   = ref(null)
 const scanFromNode   = ref(null)
 const showNodeScan   = ref(false)
 const nodeSuggestedModules = ref([])
+const showEntityModal = ref(false)
+const showRelationshipModal = ref(false)
+const entityRelationNode = ref(null)
+const entityForm = ref(defaultEntityForm())
+const relationshipForm = ref(defaultRelationshipForm())
 
 onMounted(async () => {
   await loadCase(caseId.value)
@@ -61,6 +66,7 @@ const notes       = computed(() => casesStore.caseNotes)
 const reports     = computed(() => casesStore.caseReports)
 const caseGraph   = computed(() => casesStore.caseGraph)
 const nodeParentScanId = computed(() => resolveNodeParentScanId(scanFromNode.value))
+const graphNodes = computed(() => caseGraph.value?.nodes ?? [])
 
 // Normalise case graph: the API returns scan_origins on nodes/edges,
 // but GraphVisualization expects source/target not scan_origins on edges.
@@ -148,6 +154,102 @@ function previewReport(r) {
 
 function onNodeSelect(node) {
   selectedNode.value = node
+}
+
+function defaultEntityForm() {
+  return {
+    type: 'person',
+    label: '',
+    value: '',
+    description: '',
+    confidence: '0.6',
+    verification_status: 'lead',
+    relationship_type: 'associated_with',
+    relationship_label: '',
+  }
+}
+
+function defaultRelationshipForm() {
+  return {
+    from_node_id: '',
+    to_node_id: '',
+    relationship_type: 'associated_with',
+    label: '',
+    description: '',
+    confidence: '0.6',
+    verification_status: 'lead',
+  }
+}
+
+function graphNodeType(node) {
+  return node?.graph_node_type ?? (node?.source_type === 'scan' ? 'indicator' : 'entity')
+}
+
+function nodeById(id) {
+  return graphNodes.value.find(node => node.id === id)
+}
+
+function openEntityModal(connectedNode = null) {
+  entityRelationNode.value = connectedNode
+  entityForm.value = defaultEntityForm()
+  showEntityModal.value = true
+}
+
+function openRelationshipModal(sourceNode = null) {
+  relationshipForm.value = defaultRelationshipForm()
+  if (sourceNode) relationshipForm.value.from_node_id = sourceNode.id
+  showRelationshipModal.value = true
+}
+
+async function submitEntity() {
+  const confidence = entityForm.value.confidence === '' ? null : Number(entityForm.value.confidence)
+  const payload = {
+    type: entityForm.value.type,
+    label: entityForm.value.label,
+    value: entityForm.value.value,
+    description: entityForm.value.description || null,
+    confidence,
+    verification_status: entityForm.value.verification_status,
+    properties: {},
+  }
+
+  if (entityRelationNode.value) {
+    payload.connected_to_node_type = graphNodeType(entityRelationNode.value)
+    payload.connected_to_node_id = entityRelationNode.value.id
+    payload.relationship_type = entityForm.value.relationship_type || 'associated_with'
+    payload.relationship_label = entityForm.value.relationship_label || null
+  }
+
+  await casesStore.createCaseEntity(currentCaseId(), payload)
+  showEntityModal.value = false
+  entityRelationNode.value = null
+  selectedNode.value = null
+}
+
+async function submitRelationship() {
+  if (!relationshipForm.value.from_node_id || !relationshipForm.value.to_node_id) return
+  if (relationshipForm.value.from_node_id === relationshipForm.value.to_node_id) return
+
+  const fromNode = nodeById(relationshipForm.value.from_node_id)
+  const toNode = nodeById(relationshipForm.value.to_node_id)
+  if (!fromNode || !toNode) return
+
+  const confidence = relationshipForm.value.confidence === '' ? null : Number(relationshipForm.value.confidence)
+  await casesStore.createCaseRelationship(currentCaseId(), {
+    from_node_type: graphNodeType(fromNode),
+    from_node_id: fromNode.id,
+    to_node_type: graphNodeType(toNode),
+    to_node_id: toNode.id,
+    relationship_type: relationshipForm.value.relationship_type,
+    label: relationshipForm.value.label || null,
+    description: relationshipForm.value.description || null,
+    confidence,
+    verification_status: relationshipForm.value.verification_status,
+    properties: {},
+  })
+
+  showRelationshipModal.value = false
+  selectedNode.value = null
 }
 
 async function quickStatus(status) {
@@ -307,6 +409,28 @@ async function openScanFromNode(node) {
 
         <!-- Center canvas -->
         <div class="flex-1 overflow-hidden relative">
+          <div class="absolute top-3 left-3 z-20 flex flex-wrap items-center gap-2">
+            <button class="btn-primary text-xs flex items-center gap-1.5" @click="openEntityModal()">
+              <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+              Add Node
+            </button>
+            <button
+              v-if="selectedNode"
+              class="btn-secondary text-xs"
+              @click="openEntityModal(selectedNode)"
+            >
+              Add Connected
+            </button>
+            <button
+              class="btn-secondary text-xs"
+              :disabled="graphNodes.length < 2"
+              @click="openRelationshipModal(selectedNode)"
+            >
+              Connect Nodes
+            </button>
+          </div>
           <!-- Loading overlay -->
           <div v-if="casesStore.loading" class="absolute inset-0 flex items-center justify-center z-10" style="background-color: var(--bg-primary)">
             <div class="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
@@ -316,8 +440,11 @@ async function openScanFromNode(node) {
             <svg class="h-12 w-12 opacity-20" style="color: var(--text-muted)" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>
             </svg>
-            <p class="text-sm" style="color: var(--text-muted)">No graph data yet. Add scans to this case first.</p>
-            <button class="btn-primary" @click="showScanModal = true">Add Scan</button>
+            <p class="text-sm" style="color: var(--text-muted)">No graph data yet. Add a manual node or start a scan.</p>
+            <div class="flex items-center gap-2">
+              <button class="btn-primary" @click="openEntityModal()">Add Manual Node</button>
+              <button class="btn-secondary" @click="showScanModal = true">Add Scan</button>
+            </div>
           </div>
           <GraphVisualization
             v-else
@@ -483,6 +610,162 @@ async function openScanFromNode(node) {
     @close="showNodeScan = false; scanFromNode = null; nodeSuggestedModules = []"
     @created="() => { showNodeScan = false; scanFromNode = null; nodeSuggestedModules = []; casesStore.fetchCaseGraph(caseId) }"
   />
+
+  <!-- Manual entity modal -->
+  <Teleport to="body">
+    <div v-if="showEntityModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" @click.self="showEntityModal = false">
+      <div class="card p-6 w-full max-w-lg mx-4">
+        <h2 class="text-lg font-semibold mb-1" style="color: var(--text-primary)">
+          {{ entityRelationNode ? 'Add Connected Node' : 'Add Manual Node' }}
+        </h2>
+        <p v-if="entityRelationNode" class="text-xs mb-4" style="color: var(--text-muted)">
+          Connecting from {{ entityRelationNode.kind }}: {{ entityRelationNode.value }}
+        </p>
+        <form @submit.prevent="submitEntity" class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Type</label>
+              <select v-model="entityForm.type" class="input">
+                <option value="person">Person</option>
+                <option value="alias">Alias</option>
+                <option value="username">Username</option>
+                <option value="email">Email</option>
+                <option value="phone">Phone</option>
+                <option value="address">Address</option>
+                <option value="location">Location</option>
+                <option value="social_profile">Social Profile</option>
+                <option value="company">Company</option>
+                <option value="organization">Organization</option>
+                <option value="domain">Domain</option>
+                <option value="ip">IP Address</option>
+                <option value="vehicle">Vehicle</option>
+                <option value="document">Document</option>
+                <option value="unknown">Unknown</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Status</label>
+              <select v-model="entityForm.verification_status" class="input">
+                <option value="lead">Lead</option>
+                <option value="needs_review">Needs Review</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="rejected">Rejected</option>
+                <option value="stale">Stale</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Label *</label>
+            <input v-model="entityForm.label" class="input" placeholder="Short display name" required />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Value *</label>
+            <input v-model="entityForm.value" class="input" placeholder="Name, email, phone, address, domain, or identifier" required />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Description</label>
+            <textarea v-model="entityForm.description" class="input h-20 resize-none" placeholder="Analyst note or source context" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Confidence</label>
+              <select v-model="entityForm.confidence" class="input">
+                <option value="">Unknown</option>
+                <option value="0.3">Low</option>
+                <option value="0.6">Medium</option>
+                <option value="0.9">High</option>
+                <option value="1">Verified</option>
+              </select>
+            </div>
+            <div v-if="entityRelationNode">
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Relationship</label>
+              <input v-model="entityForm.relationship_type" class="input" placeholder="associated_with" />
+            </div>
+          </div>
+          <div v-if="entityRelationNode">
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Relationship Label</label>
+            <input v-model="entityForm.relationship_label" class="input" placeholder="Optional display label" />
+          </div>
+          <div class="flex justify-end gap-3 pt-2">
+            <button type="button" class="btn-secondary" @click="showEntityModal = false">Cancel</button>
+            <button type="submit" class="btn-primary">{{ entityRelationNode ? 'Create Connected Node' : 'Create Node' }}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- Manual relationship modal -->
+  <Teleport to="body">
+    <div v-if="showRelationshipModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" @click.self="showRelationshipModal = false">
+      <div class="card p-6 w-full max-w-lg mx-4">
+        <h2 class="text-lg font-semibold mb-4" style="color: var(--text-primary)">Connect Nodes</h2>
+        <form @submit.prevent="submitRelationship" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Source *</label>
+            <select v-model="relationshipForm.from_node_id" class="input" required>
+              <option value="" disabled>Select source node</option>
+              <option v-for="node in graphNodes" :key="`from-${node.id}`" :value="node.id">
+                {{ node.kind }} · {{ node.label || node.value }}
+              </option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Target *</label>
+            <select v-model="relationshipForm.to_node_id" class="input" required>
+              <option value="" disabled>Select target node</option>
+              <option v-for="node in graphNodes" :key="`to-${node.id}`" :value="node.id">
+                {{ node.kind }} · {{ node.label || node.value }}
+              </option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Relationship *</label>
+              <input v-model="relationshipForm.relationship_type" class="input" placeholder="associated_with" required />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Status</label>
+              <select v-model="relationshipForm.verification_status" class="input">
+                <option value="lead">Lead</option>
+                <option value="needs_review">Needs Review</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="rejected">Rejected</option>
+                <option value="stale">Stale</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Label</label>
+              <input v-model="relationshipForm.label" class="input" placeholder="Optional label" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Confidence</label>
+              <select v-model="relationshipForm.confidence" class="input">
+                <option value="">Unknown</option>
+                <option value="0.3">Low</option>
+                <option value="0.6">Medium</option>
+                <option value="0.9">High</option>
+                <option value="1">Verified</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Description</label>
+            <textarea v-model="relationshipForm.description" class="input h-20 resize-none" placeholder="Why these nodes are connected" />
+          </div>
+          <p v-if="relationshipForm.from_node_id && relationshipForm.from_node_id === relationshipForm.to_node_id" class="text-xs text-red-400">
+            Source and target must be different nodes.
+          </p>
+          <div class="flex justify-end gap-3 pt-2">
+            <button type="button" class="btn-secondary" @click="showRelationshipModal = false">Cancel</button>
+            <button type="submit" class="btn-primary" :disabled="relationshipForm.from_node_id === relationshipForm.to_node_id">Create Relationship</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </Teleport>
 
   <!-- Report modal -->
   <Teleport to="body">

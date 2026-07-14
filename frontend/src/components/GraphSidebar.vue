@@ -11,14 +11,16 @@ const emit = defineEmits(['node:select'])
 
 // ── Section definitions for OSINT node kinds ─────────────────────────────
 const SECTIONS = [
+  { id: 'people',   title: 'People & Identity', icon: '👤', kinds: ['person', 'alias'] },
   { id: 'network',  title: 'DNS & Network',  icon: '🌐', kinds: ['domain', 'subdomain', 'hostname', 'ip', 'nameserver'] },
   { id: 'infra',    title: 'Infrastructure', icon: '🖥️', kinds: ['server', 'asn', 'isp', 'port', 'service'] },
   { id: 'contact',  title: 'Contact',        icon: '📧', kinds: ['email', 'phone', 'username'] },
-  { id: 'org',      title: 'Organizations',  icon: '🏢', kinds: ['organization', 'registrar'] },
-  { id: 'profiles', title: 'Profiles & URLs',icon: '🔗', kinds: ['profile_url', 'url'] },
+  { id: 'org',      title: 'Organizations',  icon: '🏢', kinds: ['organization', 'company', 'registrar'] },
+  { id: 'profiles', title: 'Profiles & URLs',icon: '🔗', kinds: ['profile_url', 'social_profile', 'url'] },
   { id: 'rep',      title: 'Reputation',     icon: '🛡️', kinds: ['reputation', 'category'] },
   { id: 'threats',  title: 'Threats',        icon: '⚠️', kinds: ['breach', 'threat', 'cve'] },
-  { id: 'location', title: 'Location',       icon: '📍', kinds: ['location'] },
+  { id: 'location', title: 'Location',       icon: '📍', kinds: ['address', 'location'] },
+  { id: 'assets',   title: 'Assets',         icon: '▣', kinds: ['vehicle', 'document'] },
   { id: 'other',    title: 'Other',          icon: '•',  kinds: [] }, // catch-all
 ]
 
@@ -26,6 +28,8 @@ const KNOWN_KINDS = new Set(SECTIONS.flatMap(s => s.kinds))
 
 const KIND_BADGE = {
   domain:       'bg-blue-500/20 text-blue-300',
+  person:       'bg-indigo-500/20 text-indigo-300',
+  alias:        'bg-purple-500/20 text-purple-300',
   subdomain:    'bg-sky-500/20 text-sky-300',
   hostname:     'bg-violet-500/20 text-violet-300',
   ip:           'bg-emerald-500/20 text-emerald-300',
@@ -36,8 +40,11 @@ const KIND_BADGE = {
   port:         'bg-cyan-500/20 text-cyan-300',
   service:      'bg-cyan-500/20 text-cyan-300',
   email:        'bg-amber-500/20 text-amber-300',
+  address:      'bg-rose-500/20 text-rose-300',
   phone:        'bg-purple-500/20 text-purple-300',
   username:     'bg-purple-500/20 text-purple-300',
+  social_profile:'bg-yellow-500/20 text-yellow-300',
+  company:      'bg-slate-500/20 text-slate-300',
   organization: 'bg-slate-500/20 text-slate-300',
   registrar:    'bg-slate-500/20 text-slate-300',
   profile_url:  'bg-yellow-500/20 text-yellow-300',
@@ -48,6 +55,8 @@ const KIND_BADGE = {
   threat:       'bg-red-600/20 text-red-400',
   cve:          'bg-orange-600/20 text-orange-400',
   location:     'bg-rose-500/20 text-rose-300',
+  vehicle:      'bg-emerald-500/20 text-emerald-300',
+  document:     'bg-slate-500/20 text-slate-300',
 }
 
 const openSections = ref(new Set(['network', 'infra', 'threats']))

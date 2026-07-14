@@ -40,8 +40,19 @@ async function copyValue() {
   setTimeout(() => { copied.value = false }, 1500)
 }
 
+const META_SYSTEM_KEYS = new Set(['source_type', 'verification_status', 'graph_node_type'])
+
+const displayMeta = computed(() => {
+  if (!props.node?.meta) return {}
+  return Object.fromEntries(
+    Object.entries(props.node.meta).filter(([k]) => !META_SYSTEM_KEYS.has(k))
+  )
+})
+
 const KIND_BADGE = {
   domain:       'bg-blue-500/20 text-blue-300',
+  person:       'bg-indigo-500/20 text-indigo-300',
+  alias:        'bg-purple-500/20 text-purple-300',
   subdomain:    'bg-sky-500/20 text-sky-300',
   hostname:     'bg-violet-500/20 text-violet-300',
   ip:           'bg-emerald-500/20 text-emerald-300',
@@ -52,8 +63,11 @@ const KIND_BADGE = {
   port:         'bg-cyan-500/20 text-cyan-300',
   service:      'bg-cyan-500/20 text-cyan-300',
   email:        'bg-amber-500/20 text-amber-300',
+  address:      'bg-rose-500/20 text-rose-300',
   phone:        'bg-purple-500/20 text-purple-300',
   username:     'bg-purple-500/20 text-purple-300',
+  social_profile:'bg-yellow-500/20 text-yellow-300',
+  company:      'bg-slate-500/20 text-slate-300',
   organization: 'bg-slate-500/20 text-slate-300',
   registrar:    'bg-slate-500/20 text-slate-300',
   profile_url:  'bg-yellow-500/20 text-yellow-300',
@@ -64,6 +78,8 @@ const KIND_BADGE = {
   threat:       'bg-red-600/20 text-red-400',
   cve:          'bg-orange-600/20 text-orange-400',
   location:     'bg-rose-500/20 text-rose-300',
+  vehicle:      'bg-emerald-500/20 text-emerald-300',
+  document:     'bg-slate-500/20 text-slate-300',
 }
 </script>
 
@@ -123,10 +139,10 @@ const KIND_BADGE = {
             </span>
           </div>
         </div>
-        <div v-if="node.meta && Object.keys(node.meta).length">
+        <div v-if="Object.keys(displayMeta).length">
           <p class="text-xs mb-1" style="color: var(--text-muted)">Metadata</p>
           <div class="space-y-0.5">
-            <div v-for="(val, key) in node.meta" :key="key" class="flex gap-2">
+            <div v-for="(val, key) in displayMeta" :key="key" class="flex gap-2">
               <span class="text-[10px] font-mono shrink-0" style="color: var(--text-muted)">{{ key }}</span>
               <span class="text-[10px] font-mono break-all" style="color: var(--text-secondary)">{{ val }}</span>
             </div>

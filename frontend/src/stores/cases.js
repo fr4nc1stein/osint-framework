@@ -10,6 +10,10 @@ export const useCasesStore = defineStore('cases', {
     caseScansCaseId: null,
     caseGraph: null,
     caseGraphCaseId: null,
+    caseEntities: [],
+    caseEntitiesCaseId: null,
+    caseRelationships: [],
+    caseRelationshipsCaseId: null,
     caseNotes: [],
     caseNotesCaseId: null,
     caseReports: [],
@@ -42,6 +46,10 @@ export const useCasesStore = defineStore('cases', {
           this.caseScansCaseId = null
           this.caseGraph = null
           this.caseGraphCaseId = null
+          this.caseEntities = []
+          this.caseEntitiesCaseId = null
+          this.caseRelationships = []
+          this.caseRelationshipsCaseId = null
           this.caseNotes = []
           this.caseNotesCaseId = null
           this.caseReports = []
@@ -88,6 +96,62 @@ export const useCasesStore = defineStore('cases', {
       this.caseGraph = data
       this.caseGraphCaseId = caseId
       return data
+    },
+
+    async fetchCaseEntities(caseId) {
+      const { data } = await api.getCaseEntities(caseId)
+      this.caseEntities = data
+      this.caseEntitiesCaseId = caseId
+      return data
+    },
+
+    async createCaseEntity(caseId, payload) {
+      const { data } = await api.createCaseEntity(caseId, payload)
+      this.caseEntities.unshift(data)
+      await this.fetchCaseGraph(caseId)
+      return data
+    },
+
+    async updateCaseEntity(caseId, entityId, payload) {
+      const { data } = await api.updateCaseEntity(caseId, entityId, payload)
+      const idx = this.caseEntities.findIndex(e => e.id === entityId)
+      if (idx !== -1) this.caseEntities.splice(idx, 1, data)
+      await this.fetchCaseGraph(caseId)
+      return data
+    },
+
+    async deleteCaseEntity(caseId, entityId) {
+      await api.deleteCaseEntity(caseId, entityId)
+      this.caseEntities = this.caseEntities.filter(e => e.id !== entityId)
+      await this.fetchCaseGraph(caseId)
+    },
+
+    async fetchCaseRelationships(caseId) {
+      const { data } = await api.getCaseRelationships(caseId)
+      this.caseRelationships = data
+      this.caseRelationshipsCaseId = caseId
+      return data
+    },
+
+    async createCaseRelationship(caseId, payload) {
+      const { data } = await api.createCaseRelationship(caseId, payload)
+      this.caseRelationships.unshift(data)
+      await this.fetchCaseGraph(caseId)
+      return data
+    },
+
+    async updateCaseRelationship(caseId, relationshipId, payload) {
+      const { data } = await api.updateCaseRelationship(caseId, relationshipId, payload)
+      const idx = this.caseRelationships.findIndex(r => r.id === relationshipId)
+      if (idx !== -1) this.caseRelationships.splice(idx, 1, data)
+      await this.fetchCaseGraph(caseId)
+      return data
+    },
+
+    async deleteCaseRelationship(caseId, relationshipId) {
+      await api.deleteCaseRelationship(caseId, relationshipId)
+      this.caseRelationships = this.caseRelationships.filter(r => r.id !== relationshipId)
+      await this.fetchCaseGraph(caseId)
     },
 
     async fetchCaseNotes(caseId) {

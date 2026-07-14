@@ -8,5 +8,19 @@ from app.models.report import Report
 from app.models.case_note import CaseNote
 from app.models.integration_credential import IntegrationCredential
 from app.models.ai_setting import AISetting
+from app.models.case_entity import CaseEntity
+from app.models.case_relationship import CaseRelationship
 
-__all__ = ["Case", "Scan", "Indicator", "Edge", "Evidence", "Report", "CaseNote", "IntegrationCredential", "AISetting"]
+__all__ = [
+    "Case",
+    "Scan",
+    "Indicator",
+    "Edge",
+    "Evidence",
+    "Report",
+    "CaseNote",
+    "IntegrationCredential",
+    "AISetting",
+    "CaseEntity",
+    "CaseRelationship",
+]

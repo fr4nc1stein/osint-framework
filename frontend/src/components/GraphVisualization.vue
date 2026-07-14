@@ -18,6 +18,8 @@ let cy = null
 // violet=hostname, teal=server, red=threat/breach, purple=username
 const KIND_BG = {
   domain:       '#0c2340',  // navy
+  person:       '#1e1b4b',  // deep indigo
+  alias:        '#1f0a30',  // dark purple
   subdomain:    '#0c2340',  // navy (same family as domain)
   host:         '#1a0e38',  // dark violet (alias for hostname)
   hostname:     '#1a0e38',  // dark violet
@@ -29,13 +31,18 @@ const KIND_BG = {
   port:         '#052020',  // dark teal
   service:      '#052020',  // dark teal
   email:        '#2e1a00',  // dark amber
+  address:      '#200e0e',  // dark red
   phone:        '#1f0a30',  // dark purple
   username:     '#1f0a30',  // dark purple
+  social_profile:'#1a1400', // dark yellow
+  company:      '#141c28',  // dark slate-blue
   organization: '#141c28',  // dark slate-blue
   registrar:    '#141414',  // near-black
   profile_url:  '#1a1400',  // dark yellow
   url:          '#1a1400',  // dark yellow
   location:     '#200e0e',  // dark red
+  vehicle:      '#122018',  // dark green-gray
+  document:     '#141414',  // near-black
   reputation:   '#1f0e00',  // dark orange
   category:     '#052020',  // dark teal
   breach:       '#2a0808',  // dark red
@@ -45,6 +52,8 @@ const KIND_BG = {
 
 const KIND_ACCENT = {
   domain:       '#3b82f6',  // blue
+  person:       '#818cf8',  // indigo
+  alias:        '#c084fc',  // purple
   subdomain:    '#60a5fa',  // lighter blue
   host:         '#a78bfa',  // violet
   hostname:     '#a78bfa',  // violet
@@ -56,13 +65,18 @@ const KIND_ACCENT = {
   port:         '#22d3ee',  // cyan
   service:      '#67e8f9',  // light cyan
   email:        '#fbbf24',  // amber-yellow
+  address:      '#fb7185',  // rose
   phone:        '#c084fc',  // purple
   username:     '#a78bfa',  // violet
+  social_profile:'#facc15', // yellow
+  company:      '#94a3b8',  // slate
   organization: '#94a3b8',  // slate
   registrar:    '#475569',  // slate-dark
   profile_url:  '#facc15',  // yellow
   url:          '#fde047',  // yellow-light
   location:     '#f87171',  // rose
+  vehicle:      '#86efac',  // green
+  document:     '#64748b',  // slate
   reputation:   '#fb923c',  // orange
   category:     '#34d399',  // emerald
   breach:       '#ef4444',  // red
@@ -72,6 +86,8 @@ const KIND_ACCENT = {
 
 const KIND_SIZE = {
   domain:       50,  // largest — primary target
+  person:       50,
+  alias:        36,
   subdomain:    36,
   host:         34,
   hostname:     34,
@@ -83,13 +99,18 @@ const KIND_SIZE = {
   port:         30,
   service:      30,
   email:        42,
+  address:      38,
   phone:        36,
   username:     36,
+  social_profile:40,
+  company:      42,
   organization: 42,
   registrar:    34,
   profile_url:  40,
   url:          32,
   location:     34,
+  vehicle:      36,
+  document:     34,
   reputation:   36,
   category:     30,
   breach:       44,  // large — high risk
@@ -103,6 +124,10 @@ const KIND_ICONS = {
     '<circle cx="12" cy="12" r="10"/>' +
     '<path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>' +
     '<path d="M2 12h20"/>',
+  person:
+    '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  alias:
+    '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>',
   subdomain:
     '<circle cx="12" cy="12" r="10"/>' +
     '<path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>' +
@@ -123,6 +148,8 @@ const KIND_ICONS = {
   email:
     '<rect width="20" height="16" x="2" y="4" rx="2"/>' +
     '<path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  address:
+    '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
   username:
     '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
   phone:
@@ -131,6 +158,11 @@ const KIND_ICONS = {
     '2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 ' +
     '2.81.7A2 2 0 0 1 22 16.92z"/>',
   organization:
+    '<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/>' +
+    '<path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/>' +
+    '<path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/>' +
+    '<path d="M10 6h4M10 10h4M10 14h4M10 18h4"/>',
+  company:
     '<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/>' +
     '<path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/>' +
     '<path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/>' +
@@ -155,6 +187,15 @@ const KIND_ICONS = {
     '<polyline points="9 22 9 12 15 12 15 22"/>',
   location:
     '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  social_profile:
+    '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>' +
+    '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  vehicle:
+    '<path d="M19 17h2l-1.5-4.5A3 3 0 0 0 16.65 10h-9.3a3 3 0 0 0-2.85 2.5L3 17h2"/>' +
+    '<circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 14h14"/>',
+  document:
+    '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>' +
+    '<polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h5"/>',
   reputation:
     '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
   category:
