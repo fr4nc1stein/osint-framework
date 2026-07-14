@@ -29,13 +29,17 @@ const nodeSuggestedModules = ref([])
 const showEntityModal = ref(false)
 const showRelationshipModal = ref(false)
 const showEvidenceModal = ref(false)
+const showTimelineModal = ref(false)
 const entityRelationNode = ref(null)
 const evidenceTarget = ref(null)
+const timelineTarget = ref(null)
 const entityForm = ref(defaultEntityForm())
 const relationshipForm = ref(defaultRelationshipForm())
 const evidenceForm = ref(defaultEvidenceForm())
+const timelineForm = ref(defaultTimelineForm())
 const evidenceFile = ref(null)
 const evidenceError = ref('')
+const timelineError = ref('')
 const selectedNodeEvidence = ref([])
 const selectedNodeEvidenceLoading = ref(false)
 
@@ -60,6 +64,7 @@ async function loadCase(id) {
   await casesStore.fetchCase(id)
   await casesStore.fetchCaseScans(id)
   await casesStore.fetchCaseEvidence(id)
+  await casesStore.fetchCaseTimeline(id)
   await casesStore.fetchCaseNotes(id)
   await casesStore.fetchCaseReports(id)
 }
@@ -73,6 +78,7 @@ const scans       = computed(() => casesStore.caseScans)
 const notes       = computed(() => casesStore.caseNotes)
 const reports     = computed(() => casesStore.caseReports)
 const evidence    = computed(() => casesStore.caseEvidence)
+const timelineEvents = computed(() => casesStore.caseTimelineEvents)
 const caseGraph   = computed(() => casesStore.caseGraph)
 const nodeParentScanId = computed(() => resolveNodeParentScanId(scanFromNode.value))
 const graphNodes = computed(() => caseGraph.value?.nodes ?? [])
@@ -83,6 +89,20 @@ const graphNodes = computed(() => caseGraph.value?.nodes ?? [])
 
 const timeline = computed(() => {
   const events = []
+  for (const ev of timelineEvents.value) {
+    events.push({
+      id: ev.id,
+      time: ev.occurred_at || ev.start_at || ev.created_at,
+      type: ev.event_type,
+      label: ev.title,
+      detail: ev.description || ev.event_type.replace(/_/g, ' '),
+      source: 'timeline_event',
+      status: ev.verification_status,
+      confidence: ev.confidence,
+      links: ev.links || [],
+      raw: ev,
+    })
+  }
   if (currentCase.value) {
     events.push({ time: currentCase.value.created_at, type: 'case', label: 'Case created', detail: currentCase.value.title })
   }
@@ -115,6 +135,40 @@ const priorityMap = { critical: 'badge-red', high: 'badge-amber', medium: 'badge
 function fmtDate(d) {
   return new Date(d).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
+
+const TIMELINE_ICON_MAP = {
+  case: { icon: '📁', cls: 'bg-blue-500/20 text-blue-300' },
+  scan: { icon: '🔍', cls: 'bg-amber-500/20 text-amber-300' },
+  scan_done: { icon: '✅', cls: 'bg-emerald-500/20 text-emerald-300' },
+  scan_failed: { icon: '❌', cls: 'bg-red-500/20 text-red-300' },
+  report: { icon: '📄', cls: 'bg-purple-500/20 text-purple-300' },
+  note: { icon: '📝', cls: 'bg-slate-500/20 text-slate-300' },
+  evidence: { icon: '📎', cls: 'bg-cyan-500/20 text-cyan-300' },
+  sighting: { icon: '👁', cls: 'bg-rose-500/20 text-rose-300' },
+  address_observed: { icon: '⌂', cls: 'bg-lime-500/20 text-lime-300' },
+  phone_observed: { icon: '☎', cls: 'bg-teal-500/20 text-teal-300' },
+  email_observed: { icon: '@', cls: 'bg-yellow-500/20 text-yellow-300' },
+  account_created: { icon: '+', cls: 'bg-indigo-500/20 text-indigo-300' },
+  profile_updated: { icon: '↻', cls: 'bg-violet-500/20 text-violet-300' },
+  domain_registered: { icon: '🌐', cls: 'bg-sky-500/20 text-sky-300' },
+  breach_observed: { icon: '!', cls: 'bg-red-600/20 text-red-400' },
+  scan_run: { icon: '🔎', cls: 'bg-amber-500/20 text-amber-300' },
+  evidence_collected: { icon: '📎', cls: 'bg-cyan-500/20 text-cyan-300' },
+  contact_attempt: { icon: '↗', cls: 'bg-orange-500/20 text-orange-300' },
+  employment_observed: { icon: '▦', cls: 'bg-slate-500/20 text-slate-300' },
+  travel_or_movement: { icon: '➜', cls: 'bg-emerald-500/20 text-emerald-300' },
+  legal_event: { icon: '§', cls: 'bg-fuchsia-500/20 text-fuchsia-300' },
+  custom: { icon: '•', cls: 'bg-slate-500/20 text-slate-300' },
+}
+
+function timelineIcon(ev) {
+  return (TIMELINE_ICON_MAP[ev.type] || TIMELINE_ICON_MAP.custom).icon
+}
+
+function timelineIconClass(ev) {
+  return (TIMELINE_ICON_MAP[ev.type] || TIMELINE_ICON_MAP.custom).cls
+}
+
 function statusIcon(s) {
   return { queued: '⏳', running: '🔄', completed: '✅', partial: '⚠️', failed: '❌', error: '❌' }[s] || '•'
 }
@@ -128,6 +182,9 @@ async function switchTab(tab) {
   }
   if (tab === 'evidence' && casesStore.caseEvidenceCaseId !== currentCaseId()) {
     await casesStore.fetchCaseEvidence(currentCaseId())
+  }
+  if (tab === 'timeline' && casesStore.caseTimelineEventsCaseId !== currentCaseId()) {
+    await casesStore.fetchCaseTimeline(currentCaseId())
   }
 }
 
@@ -215,6 +272,19 @@ function defaultEvidenceForm() {
   }
 }
 
+function defaultTimelineForm() {
+  return {
+    title: '',
+    description: '',
+    event_type: 'custom',
+    occurred_at: '',
+    occurred_at_precision: 'unknown',
+    verification_status: 'lead',
+    confidence: '0.6',
+    created_by: '',
+  }
+}
+
 function graphNodeType(node) {
   return node?.graph_node_type ?? (node?.source_type === 'scan' ? 'indicator' : 'entity')
 }
@@ -231,6 +301,19 @@ function evidenceTargetType(target) {
 
 function evidenceTargetId(target) {
   return target?.__evidence_target_id || target?.id
+}
+
+function timelineTargetType(target) {
+  return target?.__timeline_target_type || target?.__evidence_target_type || graphNodeType(target)
+}
+
+function timelineTargetId(target) {
+  return target?.__timeline_target_id || target?.__evidence_target_id || target?.id
+}
+
+function timelineTargetLabel(target) {
+  if (!target) return ''
+  return target.__timeline_label || target.__evidence_label || graphNodeLabel(target)
 }
 
 async function loadSelectedNodeEvidence(node = selectedNode.value) {
@@ -399,6 +482,16 @@ function openEvidenceModal(target = null) {
   showEvidenceModal.value = true
 }
 
+function openTimelineModal(target = null) {
+  timelineTarget.value = target
+  timelineForm.value = defaultTimelineForm()
+  timelineError.value = ''
+  if (target) {
+    timelineForm.value.title = `Timeline event for ${timelineTargetLabel(target)}`
+  }
+  showTimelineModal.value = true
+}
+
 function onEvidenceFileChange(event) {
   evidenceFile.value = event.target.files?.[0] || null
 }
@@ -475,6 +568,64 @@ async function deleteEvidence(item) {
   await casesStore.deleteCaseEvidence(currentCaseId(), item.id)
   if (selectedNode.value) {
     await loadSelectedNodeEvidence(selectedNode.value)
+  }
+}
+
+function timelineDateToIso(value) {
+  if (!value) return null
+  return new Date(value).toISOString()
+}
+
+async function submitTimelineEvent() {
+  timelineError.value = ''
+  const target = timelineTarget.value
+  try {
+    const confidence = timelineForm.value.confidence === '' ? null : Number(timelineForm.value.confidence)
+    const payload = {
+      title: timelineForm.value.title,
+      description: timelineForm.value.description || null,
+      event_type: timelineForm.value.event_type,
+      occurred_at: timelineDateToIso(timelineForm.value.occurred_at),
+      occurred_at_precision: timelineForm.value.occurred_at ? timelineForm.value.occurred_at_precision : 'unknown',
+      verification_status: timelineForm.value.verification_status,
+      confidence,
+      source_type: 'manual',
+      created_by: timelineForm.value.created_by || null,
+      links: [],
+    }
+    if (target) {
+      payload.links.push({
+        target_type: timelineTargetType(target),
+        target_id: timelineTargetId(target),
+      })
+    }
+    await casesStore.createCaseTimelineEvent(currentCaseId(), payload)
+    showTimelineModal.value = false
+    timelineTarget.value = null
+  } catch (e) {
+    timelineError.value = e.response?.data?.detail || e.message
+  }
+}
+
+async function deleteTimelineEvent(eventId) {
+  await casesStore.deleteCaseTimelineEvent(currentCaseId(), eventId)
+}
+
+function scanTimelineTarget(scan) {
+  return {
+    id: scan.id,
+    __timeline_target_type: 'scan',
+    __timeline_target_id: scan.id,
+    __timeline_label: `scan · ${scan.seed_value}`,
+  }
+}
+
+function evidenceTimelineTarget(item) {
+  return {
+    id: item.id,
+    __timeline_target_type: 'evidence',
+    __timeline_target_id: item.id,
+    __timeline_label: `evidence · ${item.title}`,
   }
 }
 </script>
@@ -633,6 +784,7 @@ async function deleteEvidence(item) {
           @close="closeSelectedNode"
           @scan-from-node="openScanFromNode"
           @attach-evidence="openEvidenceModal"
+          @add-timeline-event="openTimelineModal"
           @preview-evidence="previewEvidence"
           @download-evidence="downloadEvidence"
         />
@@ -659,6 +811,7 @@ async function deleteEvidence(item) {
                   </div>
                   <p class="text-xs mt-0.5" style="color: var(--text-muted)">{{ s.modules.join(', ') }}</p>
                 </div>
+                <button class="btn-ghost text-xs shrink-0" @click.stop="openTimelineModal(scanTimelineTarget(s))">Timeline</button>
                 <span class="text-xs shrink-0" style="color: var(--text-muted)">{{ fmtDate(s.created_at) }}</span>
               </div>
               <div v-for="child in childScans(scans, s.id)" :key="child.id"
@@ -672,6 +825,7 @@ async function deleteEvidence(item) {
                   </div>
                   <p class="text-xs mt-0.5" style="color: var(--text-muted)">{{ child.modules.join(', ') }}</p>
                 </div>
+                <button class="btn-ghost text-xs shrink-0" @click.stop="openTimelineModal(scanTimelineTarget(child))">Timeline</button>
                 <span class="text-xs shrink-0" style="color: var(--text-muted)">{{ fmtDate(child.created_at) }}</span>
               </div>
             </template>
@@ -680,28 +834,40 @@ async function deleteEvidence(item) {
 
         <!-- Timeline tab -->
         <div v-if="activeTab === 'timeline'" class="space-y-3">
+          <div class="flex items-center justify-between mb-4 gap-3">
+            <div>
+              <h2 class="text-lg font-semibold" style="color: var(--text-primary)">Timeline</h2>
+              <p class="text-sm" style="color: var(--text-muted)">Manual investigation events plus case activity.</p>
+            </div>
+            <button class="btn-primary flex items-center gap-2" @click="openTimelineModal()">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              Add Event
+            </button>
+          </div>
+
           <div v-if="timeline.length === 0" class="flex items-center justify-center h-24">
             <p style="color: var(--text-muted)">No activity yet.</p>
           </div>
           <div v-for="(ev, i) in timeline" :key="i" class="flex gap-4 items-start">
             <div class="flex flex-col items-center">
               <div class="h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                :class="{
-                  'bg-blue-500/20 text-blue-300':    ev.type === 'case',
-                  'bg-emerald-500/20 text-emerald-300': ev.type === 'scan_done',
-                  'bg-red-500/20 text-red-300':      ev.type === 'scan_failed',
-                  'bg-amber-500/20 text-amber-300':  ev.type === 'scan',
-                  'bg-purple-500/20 text-purple-300':ev.type === 'report',
-                  'bg-slate-500/20 text-slate-300':  ev.type === 'note',
-                }">
-                {{ { case: '📁', scan: '🔍', scan_done: '✅', scan_failed: '❌', report: '📄', note: '📝' }[ev.type] || '•' }}
+                :class="timelineIconClass(ev)">
+                {{ timelineIcon(ev) }}
               </div>
               <div v-if="i < timeline.length - 1" class="w-0.5 flex-1 my-1" style="background-color: var(--border)"></div>
             </div>
             <div class="pb-4">
               <p class="text-sm font-medium" style="color: var(--text-primary)">{{ ev.label }}</p>
               <p class="text-sm" style="color: var(--text-secondary)">{{ ev.detail }}</p>
-              <p class="text-xs mt-0.5" style="color: var(--text-muted)">{{ fmtDate(ev.time) }}</p>
+              <div class="flex flex-wrap gap-1.5 mt-1">
+                <span v-if="ev.source === 'timeline_event'" class="badge badge-blue">{{ ev.type.replace(/_/g, ' ') }}</span>
+                <span v-if="ev.status" class="badge badge-slate">{{ ev.status.replace(/_/g, ' ') }}</span>
+                <span v-if="ev.links?.length" class="badge badge-slate">{{ ev.links.length }} link{{ ev.links.length === 1 ? '' : 's' }}</span>
+              </div>
+              <div class="flex items-center gap-2 mt-0.5">
+                <p class="text-xs" style="color: var(--text-muted)">{{ fmtDate(ev.time) }}</p>
+                <button v-if="ev.source === 'timeline_event'" class="btn-ghost text-xs text-red-400" @click="deleteTimelineEvent(ev.id)">Delete</button>
+              </div>
             </div>
           </div>
         </div>
@@ -760,6 +926,7 @@ async function deleteEvidence(item) {
               <div class="flex gap-2 pt-1">
                 <button v-if="item.preview_url" class="btn-secondary text-xs" @click="previewEvidence(item)">Preview</button>
                 <button v-if="item.download_url" class="btn-secondary text-xs" @click="downloadEvidence(item)">Download</button>
+                <button class="btn-secondary text-xs" @click="openTimelineModal(evidenceTimelineTarget(item))">Timeline</button>
               </div>
             </div>
           </div>
@@ -1065,6 +1232,104 @@ async function deleteEvidence(item) {
           <div class="flex justify-end gap-3 pt-2">
             <button type="button" class="btn-secondary" @click="showEvidenceModal = false">Cancel</button>
             <button type="submit" class="btn-primary">Save Evidence</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- Timeline modal -->
+  <Teleport to="body">
+    <div v-if="showTimelineModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" @click.self="showTimelineModal = false">
+      <div class="card p-6 w-full max-w-lg mx-4">
+        <h2 class="text-lg font-semibold mb-1" style="color: var(--text-primary)">Add Timeline Event</h2>
+        <p v-if="timelineTarget" class="text-xs mb-4" style="color: var(--text-muted)">
+          Linking to {{ timelineTargetLabel(timelineTarget) }}
+        </p>
+        <form @submit.prevent="submitTimelineEvent" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Title *</label>
+            <input v-model="timelineForm.title" class="input" placeholder="Observed address, account activity, contact attempt..." required />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Type</label>
+              <select v-model="timelineForm.event_type" class="input">
+                <option value="custom">Custom</option>
+                <option value="sighting">Sighting</option>
+                <option value="address_observed">Address Observed</option>
+                <option value="phone_observed">Phone Observed</option>
+                <option value="email_observed">Email Observed</option>
+                <option value="account_created">Account Created</option>
+                <option value="profile_updated">Profile Updated</option>
+                <option value="domain_registered">Domain Registered</option>
+                <option value="breach_observed">Breach Observed</option>
+                <option value="scan_run">Scan Run</option>
+                <option value="evidence_collected">Evidence Collected</option>
+                <option value="contact_attempt">Contact Attempt</option>
+                <option value="employment_observed">Employment Observed</option>
+                <option value="travel_or_movement">Travel or Movement</option>
+                <option value="legal_event">Legal Event</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Status</label>
+              <select v-model="timelineForm.verification_status" class="input">
+                <option value="lead">Lead</option>
+                <option value="needs_review">Needs Review</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="rejected">Rejected</option>
+                <option value="stale">Stale</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Occurred At</label>
+              <input v-model="timelineForm.occurred_at" class="input" type="datetime-local" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Precision</label>
+              <select v-model="timelineForm.occurred_at_precision" class="input">
+                <option value="exact">Exact</option>
+                <option value="date">Date</option>
+                <option value="month">Month</option>
+                <option value="year">Year</option>
+                <option value="approximate">Approximate</option>
+                <option value="unknown">Unknown</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Confidence</label>
+              <select v-model="timelineForm.confidence" class="input">
+                <option value="">Unknown</option>
+                <option value="0.3">Low</option>
+                <option value="0.6">Medium</option>
+                <option value="0.9">High</option>
+                <option value="1">Verified</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Created By</label>
+              <input v-model="timelineForm.created_by" class="input" placeholder="Analyst name" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Description</label>
+            <textarea v-model="timelineForm.description" class="input h-24 resize-none" placeholder="What happened, how it was observed, and why it matters" />
+          </div>
+
+          <p v-if="timelineError" class="text-sm text-red-400">{{ timelineError }}</p>
+
+          <div class="flex justify-end gap-3 pt-2">
+            <button type="button" class="btn-secondary" @click="showTimelineModal = false">Cancel</button>
+            <button type="submit" class="btn-primary">Save Event</button>
           </div>
         </form>
       </div>

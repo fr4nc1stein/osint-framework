@@ -16,6 +16,8 @@ export const useCasesStore = defineStore('cases', {
     caseRelationshipsCaseId: null,
     caseEvidence: [],
     caseEvidenceCaseId: null,
+    caseTimelineEvents: [],
+    caseTimelineEventsCaseId: null,
     caseNotes: [],
     caseNotesCaseId: null,
     caseReports: [],
@@ -54,6 +56,8 @@ export const useCasesStore = defineStore('cases', {
           this.caseRelationshipsCaseId = null
           this.caseEvidence = []
           this.caseEvidenceCaseId = null
+          this.caseTimelineEvents = []
+          this.caseTimelineEventsCaseId = null
           this.caseNotes = []
           this.caseNotesCaseId = null
           this.caseReports = []
@@ -182,6 +186,33 @@ export const useCasesStore = defineStore('cases', {
     async deleteCaseEvidence(caseId, evidenceId) {
       await api.deleteCaseEvidence(caseId, evidenceId)
       this.caseEvidence = this.caseEvidence.filter(e => e.id !== evidenceId)
+    },
+
+    async fetchCaseTimeline(caseId, params = undefined) {
+      const { data } = await api.getCaseTimeline(caseId, params)
+      if (!params?.target_type && !params?.target_id) {
+        this.caseTimelineEvents = data
+        this.caseTimelineEventsCaseId = caseId
+      }
+      return data
+    },
+
+    async createCaseTimelineEvent(caseId, payload) {
+      const { data } = await api.createCaseTimelineEvent(caseId, payload)
+      this.caseTimelineEvents.unshift(data)
+      return data
+    },
+
+    async updateCaseTimelineEvent(caseId, eventId, payload) {
+      const { data } = await api.updateCaseTimelineEvent(caseId, eventId, payload)
+      const idx = this.caseTimelineEvents.findIndex(e => e.id === eventId)
+      if (idx !== -1) this.caseTimelineEvents.splice(idx, 1, data)
+      return data
+    },
+
+    async deleteCaseTimelineEvent(caseId, eventId) {
+      await api.deleteCaseTimelineEvent(caseId, eventId)
+      this.caseTimelineEvents = this.caseTimelineEvents.filter(e => e.id !== eventId)
     },
 
     async fetchCaseNotes(caseId) {

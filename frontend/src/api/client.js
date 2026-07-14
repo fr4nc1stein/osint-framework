@@ -47,6 +47,10 @@ export const api = {
   evidenceDownloadUrl: (caseId, evidenceId) => `/api/v1/cases/${caseId}/evidence/${evidenceId}/download`,
   evidenceThumbnailUrl: (caseId, evidenceId) => `/api/v1/cases/${caseId}/evidence/${evidenceId}/thumbnail`,
   evidencePreviewUrl: (caseId, evidenceId) => `/api/v1/cases/${caseId}/evidence/${evidenceId}/preview`,
+  getCaseTimeline: (caseId, params) => apiClient.get(`/api/v1/cases/${caseId}/timeline`, { params }),
+  createCaseTimelineEvent: (caseId, data) => apiClient.post(`/api/v1/cases/${caseId}/timeline`, data),
+  updateCaseTimelineEvent: (caseId, eventId, data) => apiClient.put(`/api/v1/cases/${caseId}/timeline/${eventId}`, data),
+  deleteCaseTimelineEvent: (caseId, eventId) => apiClient.delete(`/api/v1/cases/${caseId}/timeline/${eventId}`),
 
   // Case Notes
   getCaseNotes: (caseId) => apiClient.get(`/api/v1/cases/${caseId}/notes`),

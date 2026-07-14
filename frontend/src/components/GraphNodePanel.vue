@@ -8,7 +8,7 @@ const props = defineProps({
   evidenceLoading: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['close', 'scan-from-node', 'attach-evidence', 'preview-evidence', 'download-evidence'])
+const emit = defineEmits(['close', 'scan-from-node', 'attach-evidence', 'add-timeline-event', 'preview-evidence', 'download-evidence'])
 
 const copied = ref(false)
 
@@ -23,17 +23,6 @@ const connectedEdges = computed(() => {
 function linkedNode(edge) {
   const id = edge.source === props.node.id ? edge.target : edge.source
   return nodes.value.find(n => n.id === id)
-}
-
-function evidenceTargetForEdge(edge) {
-  const linked = linkedNode(edge)
-  const targetType = edge.source_type === 'manual' ? 'relationship' : 'graph_edge'
-  return {
-    ...edge,
-    __evidence_target_type: targetType,
-    __evidence_target_id: edge.id,
-    __evidence_label: `${(edge.relationship || edge.label || targetType).replace(/_/g, ' ')} · ${linked?.label || linked?.value || 'related node'}`,
-  }
 }
 
 function confColor(c) {
@@ -175,9 +164,14 @@ const KIND_BADGE = {
           <p class="text-xs font-semibold uppercase tracking-wider" style="color: var(--text-muted)">
             Evidence
           </p>
-          <span class="badge text-[10px]" :class="evidenceItems.length ? 'badge-blue' : 'badge-slate'">
-            {{ evidenceLoading ? '…' : evidenceItems.length }}
-          </span>
+          <div class="flex items-center gap-1.5">
+            <span class="badge text-[10px]" :class="evidenceItems.length ? 'badge-blue' : 'badge-slate'">
+              {{ evidenceLoading ? '…' : evidenceItems.length }}
+            </span>
+            <button class="btn-ghost text-[10px] px-0" @click="emit('attach-evidence', node)">
+              Attach
+            </button>
+          </div>
         </div>
 
         <div v-if="evidenceLoading" class="text-xs py-2" style="color: var(--text-muted)">
@@ -186,9 +180,6 @@ const KIND_BADGE = {
 
         <div v-else-if="evidenceItems.length === 0" class="space-y-2">
           <p class="text-xs" style="color: var(--text-muted)">No evidence linked to this node.</p>
-          <button class="btn-secondary w-full text-xs" @click="emit('attach-evidence', node)">
-            Attach evidence
-          </button>
         </div>
 
         <div v-else class="space-y-2">
@@ -224,9 +215,6 @@ const KIND_BADGE = {
               </button>
               <button v-if="item.download_url" class="btn-ghost text-[10px] px-0" @click="emit('download-evidence', item)">
                 Download
-              </button>
-              <button class="btn-ghost text-[10px] px-0 ml-auto" @click="emit('attach-evidence', node)">
-                Add
               </button>
             </div>
           </div>
@@ -270,9 +258,6 @@ const KIND_BADGE = {
               </svg>
               {{ edge.source_module }}
             </div>
-            <button class="btn-ghost text-[10px] px-0" @click="emit('attach-evidence', evidenceTargetForEdge(edge))">
-              Attach evidence
-            </button>
           </div>
         </div>
       </div>
@@ -281,11 +266,11 @@ const KIND_BADGE = {
     <!-- Scan from node action -->
     <div class="shrink-0 px-4 py-3 border-t" style="border-color: var(--border)">
       <button class="btn-secondary w-full flex items-center justify-center gap-2 text-sm mb-2"
-        @click="emit('attach-evidence', node)">
+        @click="emit('add-timeline-event', node)">
         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-          <path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 1 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.82-2.82l8.48-8.49"/>
+          <path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="9"/>
         </svg>
-        Attach evidence
+        Add timeline event
       </button>
       <button class="btn-primary w-full flex items-center justify-center gap-2 text-sm"
         @click="emit('scan-from-node', node)">

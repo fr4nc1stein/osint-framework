@@ -13,6 +13,7 @@ from app.core.database import get_db
 from app.models.case import Case
 from app.models.case_entity import CaseEntity
 from app.models.case_relationship import CaseRelationship
+from app.models.case_timeline import CaseTimelineEvent
 from app.models.case_note import CaseNote
 from app.models.edge import Edge, scan_findings
 from app.models.evidence import Evidence, EvidenceLink
@@ -113,7 +114,10 @@ async def _target_exists(case_id: uuid.UUID, target_type: str, target_id: uuid.U
         return result.scalar_one_or_none() is not None
 
     if target_type == "timeline_event":
-        return False
+        result = await db.execute(
+            select(CaseTimelineEvent.id).where(CaseTimelineEvent.id == target_id, CaseTimelineEvent.case_id == case_id)
+        )
+        return result.scalar_one_or_none() is not None
 
     return False
 

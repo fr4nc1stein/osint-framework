@@ -83,3 +83,8 @@ class Case(Base):
         back_populates="case",
         cascade="all, delete-orphan"
     )
+    timeline_events: Mapped[List["CaseTimelineEvent"]] = relationship(
+        "CaseTimelineEvent",
+        back_populates="case",
+        cascade="all, delete-orphan"
+    )

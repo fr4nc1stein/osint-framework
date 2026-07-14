@@ -1,7 +1,7 @@
 # OSIF v2.0 - Phase 3.4 Plan: Skip Tracing, Private Investigation Workspace, Manual Graph, Timeline, Evidence, and Maps
 
 **Date:** 2026-07-14  
-**Status:** In Progress — Phase 3.4A and 3.4B complete; Phase 3.4C recommended next
+**Status:** In Progress — Phase 3.4A, 3.4B, and 3.4C complete; Phase 3.4D recommended next
 **Focus:** Extend cases from automated OSINT scan containers into full investigation workspaces for skip tracing and private investigation workflows.
 
 ---
@@ -1103,15 +1103,15 @@ Before production use, legal and policy requirements should be reviewed for the 
 - [x] Add evidence panel on nodes and relationships.
 - [x] Show linked evidence indication and preview/download actions in the graph node sidebar.
 
-### Step 3: Timeline — Recommended Next
+### Step 3: Timeline — Done
 
-- [ ] Add timeline event model.
-- [ ] Add timeline link model.
-- [ ] Add timeline CRUD endpoints.
-- [ ] Add timeline tab.
-- [ ] Add create timeline event from node/evidence/scan result.
+- [x] Add timeline event model.
+- [x] Add timeline link model.
+- [x] Add timeline CRUD endpoints.
+- [x] Add timeline tab.
+- [x] Add create timeline event from node/evidence/scan result.
 
-### Step 4: Map View
+### Step 4: Map View — Recommended Next
 
 - [ ] Add location model or normalized location properties.
 - [ ] Add map endpoint.
