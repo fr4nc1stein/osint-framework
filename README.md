@@ -32,6 +32,26 @@ OSIF v2.0 is a complete rewrite of the original CLI tool into a full-stack, API-
 
 ---
 
+## Screenshots
+
+### Investigation Graph
+
+![Graph](screenshots/v2/graph.png "Case knowledge graph with manual entities and scan indicators")
+
+### Scan Execution
+
+![Scan](screenshots/v2/scan.png "Real-time scan progress with module status")
+
+### Timeline
+
+![Timeline](screenshots/v2/timeline.png "Case timeline with events and evidence")
+
+### Integrations
+
+![Integrations](screenshots/v2/integration.png "API key management and integration settings")
+
+---
+
 ## Architecture
 
 ```
@@ -373,9 +393,40 @@ docker exec -it osif_console ./osif
 ```
 
 ```
+─$ ./osif
+
+
+                                                         ##     ####   #####   ######
+                                                        #  #   #    #    #     #
+                                                       #    #  #         #     #
+                                                       #    #   ####     #     ####
+                                                       #    #       #    #     #
+                                                        #  #   #    #    #     #
+                                                         ##     ####   #####   #
+
+
+                                                             >> OSINT Framework
+                                                                 >> @laet4x
+
+
+
+        -=[ 1 api           ]=-
+        -=[ 2 dns           ]=-
+        -=[ 1 subdomain     ]=-
+        -=[ 1 uncategorized ]=-
+
+[!] There are some issues ; use 'show issues' to see more details
 osif > use dns/dns_records
-osif dns(dns_records) > set DOMAIN example.com
-osif dns(dns_records) > run
+osif dns(dns_records) > show options
+
+Module options
+==============
+
+   Name    Value       Required  Description
+   ----    -----       --------  -----------
+   DOMAIN  google.com  Y         Provide your target Domain
+
+osif dns(dns_records) >
 ```
 
 ---
