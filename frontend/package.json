@@ -12,6 +12,7 @@
     "axios": "^1.18.1",
     "cytoscape": "^3.34.0",
     "lucide-vue-next": "^1.0.0",
+    "mapbox-gl": "^3.15.0",
     "pinia": "^3.0.4",
     "vue": "^3.5.39",
     "vue-router": "^5.1.0"

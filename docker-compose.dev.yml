@@ -126,6 +126,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_MAPBOX_TOKEN: ${VITE_MAPBOX_TOKEN:-}
     container_name: osif_frontend
     ports:
       - "3000:80"

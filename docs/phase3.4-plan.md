@@ -1,7 +1,7 @@
 # OSIF v2.0 - Phase 3.4 Plan: Skip Tracing, Private Investigation Workspace, Manual Graph, Timeline, Evidence, and Maps
 
 **Date:** 2026-07-14  
-**Status:** In Progress — Phase 3.4A, 3.4B, and 3.4C complete; Phase 3.4D recommended next
+**Status:** In Progress — Phase 3.4A, 3.4B, 3.4C, and 3.4D complete; Phase 3.4E recommended next
 **Focus:** Extend cases from automated OSINT scan containers into full investigation workspaces for skip tracing and private investigation workflows.
 
 ---
@@ -1111,14 +1111,14 @@ Before production use, legal and policy requirements should be reviewed for the 
 - [x] Add timeline tab.
 - [x] Add create timeline event from node/evidence/scan result.
 
-### Step 4: Map View — Recommended Next
+### Step 4: Map View — Done
 
-- [ ] Add location model or normalized location properties.
-- [ ] Add map endpoint.
-- [ ] Add map tab.
-- [ ] Add manual latitude/longitude support.
-- [ ] Add marker filtering.
-- [ ] Add timeline and graph links from map markers.
+- [x] Add location model or normalized location properties.
+- [x] Add map endpoint.
+- [x] Add map tab.
+- [x] Add manual latitude/longitude support.
+- [x] Add marker filtering.
+- [x] Add timeline and graph links from map markers.
 
 ### Step 5: Leads And Review
 
@@ -1200,7 +1200,7 @@ Before production use, legal and policy requirements should be reviewed for the 
 
 ## Implementation Log
 
-**Last updated:** 2026-07-14
+**Last updated:** 2026-07-16
 
 ### ✅ Plan A — Manual Entities, Manual Relationships, And Graph Merge
 
@@ -1255,13 +1255,88 @@ Browser visual testing note:
 
 - The in-app browser automation surface was unavailable in this session, so visual click-through testing could not be completed through Browser.
 
+### Plan B — MinIO Evidence Attachments
+
+Implemented the evidence attachment foundation:
+
+- Added MinIO-backed evidence file storage in Docker.
+- Added automated bucket initialization through the Docker setup.
+- Added backend-only upload, download, thumbnail, and preview routes.
+- Added URL, note, file, image, PDF, and document evidence support.
+- Added SHA-256 file hashing and image thumbnail generation.
+- Added reusable evidence links for entities, relationships, indicators, graph edges, timeline events, reports, scans, notes, and cases.
+- Added evidence library UI.
+- Added graph node sidebar evidence indication, linked evidence list, preview, download, and attach actions.
+- Confirmed frontend talks to backend evidence API paths only, not directly to MinIO.
+
+Validation completed:
+
+- Frontend production build passed.
+- Python syntax checks passed.
+- Docker stack ran with MinIO and backend services.
+- Evidence upload, list, download, link-to-entity, and case deletion cleanup smoke tests passed.
+
+### Plan C — Case Timeline Events
+
+Implemented the timeline foundation:
+
+- Added `case_timeline_events` and `case_timeline_links`.
+- Added timeline CRUD endpoints under `/api/v1/cases/{case_id}/timeline`.
+- Added timeline tab in the case workspace.
+- Added manual timeline event creation.
+- Added timeline creation from graph nodes, evidence, and scan rows.
+- Added timeline links to entities, evidence, scans, indicators, graph edges, notes, relationships, and cases.
+- Added distinct timeline icons for case activity, scans, reports, notes, evidence, sightings, address observations, contact attempts, movement, legal events, and custom events.
+- Added evidence support for linking directly to timeline events.
+
+Validation completed:
+
+- Frontend production build passed.
+- Python syntax checks passed.
+- Alembic migration `a3d8e4f9c2b7_add_case_timeline_events.py` applied successfully in Docker.
+- API smoke test created, filtered, updated, linked, and deleted timeline events.
+
+### Plan D — Case Map View
+
+Implemented the first map workspace slice:
+
+- Added `GET /api/v1/cases/{case_id}/map`.
+- Built normalized map markers from:
+  - manual entities with `latitude` and `longitude` in `properties`
+  - evidence records with map coordinates in metadata
+  - timeline events linked to location entities
+  - scan-derived geolocation evidence such as IP geolocation results
+- Added unmapped queues for address/location-capable objects missing coordinates.
+- Added manual coordinate fields to the manual node modal:
+  - map label
+  - latitude
+  - longitude
+  - location precision
+- Added timeline location selection so sightings, address observations, movement, and other events can plot through a location entity.
+- Added a full-height Map tab with:
+  - marker index
+  - operations-map canvas
+  - marker detail panel
+  - source, status, and type filters
+  - confidence, precision, status, and source badges
+  - approximate-location warnings
+  - linked graph/evidence/timeline targets
+  - attach evidence and add timeline actions from a marker
+- Added a Mapbox token readiness indicator using `VITE_MAPBOX_TOKEN`.
+- Added Mapbox GL rendering when `VITE_MAPBOX_TOKEN` is configured.
+- Current implementation falls back to a static operations-map canvas when no Mapbox token is configured.
+
+Validation completed:
+
+- `python3 -m py_compile backend/app/api/v1/case_graph.py` passed.
+- `npm --prefix frontend run build` passed.
+
 ### Next Slice
 
-Recommended Plan B:
+Recommended Plan E:
 
-- Evidence attachment foundation:
-  - evidence upload
-  - URL/note evidence
-  - evidence links to entities and relationships
-  - image metadata and thumbnails
-  - evidence count badges on graph nodes and edges
+- Leads and review workflow:
+  - lead board
+  - promote/reject/merge actions
+  - scan result review queue
+  - separation of confirmed facts from unverified leads across graph, map, reports, and dossier

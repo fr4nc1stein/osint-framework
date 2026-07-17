@@ -168,8 +168,8 @@ const KIND_BADGE = {
             <span class="badge text-[10px]" :class="evidenceItems.length ? 'badge-blue' : 'badge-slate'">
               {{ evidenceLoading ? '…' : evidenceItems.length }}
             </span>
-            <button class="btn-ghost text-[10px] px-0" @click="emit('attach-evidence', node)">
-              Attach
+            <button class="btn-secondary text-xs px-2.5 py-1.5" @click="emit('attach-evidence', node)">
+              Attach Evidence
             </button>
           </div>
         </div>

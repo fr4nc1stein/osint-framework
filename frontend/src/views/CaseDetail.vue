@@ -5,6 +5,7 @@ import { useCasesStore } from '../stores/cases'
 import GraphVisualization from '../components/GraphVisualization.vue'
 import GraphSidebar from '../components/GraphSidebar.vue'
 import GraphNodePanel from '../components/GraphNodePanel.vue'
+import CaseMapView from '../components/CaseMapView.vue'
 import CreateScanModal from '../components/CreateScanModal.vue'
 import CaseEditModal from '../components/CaseEditModal.vue'
 import { api } from '../api/client'
@@ -15,7 +16,7 @@ const casesStore = useCasesStore()
 
 const caseId    = computed(() => route.params.id)
 const activeTab = ref('scans')
-const tabs      = ['scans', 'graph', 'timeline', 'evidence', 'notes', 'reports']
+const tabs      = ['scans', 'graph', 'map', 'timeline', 'evidence', 'notes', 'reports']
 
 const showScanModal  = ref(false)
 const showEditModal  = ref(false)
@@ -80,8 +81,12 @@ const reports     = computed(() => casesStore.caseReports)
 const evidence    = computed(() => casesStore.caseEvidence)
 const timelineEvents = computed(() => casesStore.caseTimelineEvents)
 const caseGraph   = computed(() => casesStore.caseGraph)
+const caseMap     = computed(() => casesStore.caseMap)
 const nodeParentScanId = computed(() => resolveNodeParentScanId(scanFromNode.value))
 const graphNodes = computed(() => caseGraph.value?.nodes ?? [])
+const locationEntityOptions = computed(() => graphNodes.value.filter(node => (
+  node.graph_node_type === 'entity' && ['address', 'location', 'company', 'organization', 'person'].includes(node.kind)
+)))
 
 // Normalise case graph: the API returns scan_origins on nodes/edges,
 // but GraphVisualization expects source/target not scan_origins on edges.
@@ -180,6 +185,9 @@ async function switchTab(tab) {
   if (tab === 'graph' && casesStore.caseGraphCaseId !== currentCaseId()) {
     await casesStore.fetchCaseGraph(currentCaseId())
   }
+  if (tab === 'map' && casesStore.caseMapCaseId !== currentCaseId()) {
+    await casesStore.fetchCaseMap(currentCaseId())
+  }
   if (tab === 'evidence' && casesStore.caseEvidenceCaseId !== currentCaseId()) {
     await casesStore.fetchCaseEvidence(currentCaseId())
   }
@@ -245,6 +253,10 @@ function defaultEntityForm() {
     verification_status: 'lead',
     relationship_type: 'associated_with',
     relationship_label: '',
+    address_text: '',
+    latitude: '',
+    longitude: '',
+    location_precision: 'unknown',
   }
 }
 
@@ -279,6 +291,7 @@ function defaultTimelineForm() {
     event_type: 'custom',
     occurred_at: '',
     occurred_at_precision: 'unknown',
+    location_entity_id: '',
     verification_status: 'lead',
     confidence: '0.6',
     created_by: '',
@@ -314,6 +327,48 @@ function timelineTargetId(target) {
 function timelineTargetLabel(target) {
   if (!target) return ''
   return target.__timeline_label || target.__evidence_label || graphNodeLabel(target)
+}
+
+function mapActionTarget(marker) {
+  if (!marker) return null
+  return {
+    id: marker.target_id,
+    label: marker.label,
+    value: marker.label,
+    kind: marker.entity_type || marker.marker_type,
+    __evidence_target_type: marker.target_type,
+    __evidence_target_id: marker.target_id,
+    __evidence_label: `map · ${marker.label}`,
+    __timeline_target_type: marker.target_type,
+    __timeline_target_id: marker.target_id,
+    __timeline_label: `map · ${marker.label}`,
+  }
+}
+
+async function openMapTarget(link) {
+  if (!link) return
+  if (['entity', 'indicator'].includes(link.target_type)) {
+    if (casesStore.caseGraphCaseId !== currentCaseId()) {
+      await casesStore.fetchCaseGraph(currentCaseId())
+    }
+    const node = graphNodes.value.find(item => item.id === link.target_id)
+    if (node) {
+      activeTab.value = 'graph'
+      onNodeSelect(node)
+    }
+    return
+  }
+  if (link.target_type === 'evidence') {
+    activeTab.value = 'evidence'
+    return
+  }
+  if (link.target_type === 'timeline_event') {
+    activeTab.value = 'timeline'
+    return
+  }
+  if (link.target_type === 'scan') {
+    router.push(`/scan/${link.target_id}`)
+  }
 }
 
 async function loadSelectedNodeEvidence(node = selectedNode.value) {
@@ -376,6 +431,11 @@ async function submitEntity() {
     properties: {},
   }
 
+  if (entityForm.value.address_text) payload.properties.address_text = entityForm.value.address_text
+  if (entityForm.value.latitude !== '') payload.properties.latitude = Number(entityForm.value.latitude)
+  if (entityForm.value.longitude !== '') payload.properties.longitude = Number(entityForm.value.longitude)
+  if (entityForm.value.location_precision) payload.properties.location_precision = entityForm.value.location_precision
+
   if (entityRelationNode.value) {
     payload.connected_to_node_type = graphNodeType(entityRelationNode.value)
     payload.connected_to_node_id = entityRelationNode.value.id
@@ -387,6 +447,9 @@ async function submitEntity() {
   showEntityModal.value = false
   entityRelationNode.value = null
   selectedNode.value = null
+  if (activeTab.value === 'map') {
+    await casesStore.fetchCaseMap(currentCaseId())
+  }
 }
 
 async function submitRelationship() {
@@ -489,6 +552,9 @@ function openTimelineModal(target = null) {
   if (target) {
     timelineForm.value.title = `Timeline event for ${timelineTargetLabel(target)}`
   }
+  if (casesStore.caseGraphCaseId !== currentCaseId()) {
+    casesStore.fetchCaseGraph(currentCaseId()).catch(() => {})
+  }
   showTimelineModal.value = true
 }
 
@@ -550,6 +616,9 @@ async function submitEvidence() {
     if (isSelectedNodeTarget(target)) {
       await loadSelectedNodeEvidence(selectedNode.value)
     }
+    if (activeTab.value === 'map') {
+      await casesStore.fetchCaseMap(currentCaseId())
+    }
     evidenceTarget.value = null
   } catch (e) {
     evidenceError.value = e.response?.data?.detail || e.message
@@ -593,6 +662,9 @@ async function submitTimelineEvent() {
       created_by: timelineForm.value.created_by || null,
       links: [],
     }
+    if (timelineForm.value.location_entity_id) {
+      payload.location_entity_id = timelineForm.value.location_entity_id
+    }
     if (target) {
       payload.links.push({
         target_type: timelineTargetType(target),
@@ -602,6 +674,9 @@ async function submitTimelineEvent() {
     await casesStore.createCaseTimelineEvent(currentCaseId(), payload)
     showTimelineModal.value = false
     timelineTarget.value = null
+    if (activeTab.value === 'map') {
+      await casesStore.fetchCaseMap(currentCaseId())
+    }
   } catch (e) {
     timelineError.value = e.response?.data?.detail || e.message
   }
@@ -712,6 +787,7 @@ function evidenceTimelineTarget(item) {
             @click="switchTab(tab)">
             {{ tab }}
             <span v-if="tab === 'scans'  && scans.length"   class="ml-1.5 badge badge-blue">{{ scans.length }}</span>
+            <span v-if="tab === 'map' && caseMap?.counts?.markers" class="ml-1.5 badge badge-green">{{ caseMap.counts.markers }}</span>
             <span v-if="tab === 'evidence' && evidence.length" class="ml-1.5 badge badge-slate">{{ evidence.length }}</span>
             <span v-if="tab === 'notes'  && notes.length"   class="ml-1.5 badge badge-slate">{{ notes.length }}</span>
             <span v-if="tab === 'reports'&& reports.length" class="ml-1.5 badge badge-slate">{{ reports.length }}</span>
@@ -787,6 +863,17 @@ function evidenceTimelineTarget(item) {
           @add-timeline-event="openTimelineModal"
           @preview-evidence="previewEvidence"
           @download-evidence="downloadEvidence"
+        />
+      </div>
+
+      <!-- ── MAP TAB ───────────────────────────────────────── -->
+      <div v-else-if="activeTab === 'map'" class="flex-1 min-h-0 overflow-hidden">
+        <CaseMapView
+          :map-data="caseMap"
+          :loading="casesStore.loading"
+          @open-target="openMapTarget"
+          @add-evidence="openEvidenceModal(mapActionTarget($event))"
+          @add-timeline="openTimelineModal(mapActionTarget($event))"
         />
       </div>
 
@@ -1064,6 +1151,33 @@ function evidenceTimelineTarget(item) {
             <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Value *</label>
             <input v-model="entityForm.value" class="input" placeholder="Name, email, phone, address, domain, or identifier" required />
           </div>
+          <div v-if="['address', 'location', 'company', 'organization', 'person', 'vehicle'].includes(entityForm.type)" class="grid grid-cols-2 gap-3">
+            <div class="col-span-2">
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Map Label</label>
+              <input v-model="entityForm.address_text" class="input" placeholder="Address, place name, or location note" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Latitude</label>
+              <input v-model="entityForm.latitude" class="input" type="number" step="any" min="-90" max="90" placeholder="14.5995" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Longitude</label>
+              <input v-model="entityForm.longitude" class="input" type="number" step="any" min="-180" max="180" placeholder="120.9842" />
+            </div>
+            <div class="col-span-2">
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Location Precision</label>
+              <select v-model="entityForm.location_precision" class="input">
+                <option value="exact">Exact</option>
+                <option value="building">Building</option>
+                <option value="street">Street</option>
+                <option value="city">City</option>
+                <option value="region">Region</option>
+                <option value="country">Country</option>
+                <option value="ip_geo_approximate">IP Geo Approximate</option>
+                <option value="unknown">Unknown</option>
+              </select>
+            </div>
+          </div>
           <div>
             <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Description</label>
             <textarea v-model="entityForm.description" class="input h-20 resize-none" placeholder="Analyst note or source context" />
@@ -1301,6 +1415,16 @@ function evidenceTimelineTarget(item) {
                 <option value="unknown">Unknown</option>
               </select>
             </div>
+          </div>
+
+          <div v-if="locationEntityOptions.length">
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Location</label>
+            <select v-model="timelineForm.location_entity_id" class="input">
+              <option value="">No location</option>
+              <option v-for="node in locationEntityOptions" :key="node.id" :value="node.id">
+                {{ node.kind }} · {{ node.label || node.value }}
+              </option>
+            </select>
           </div>
 
           <div class="grid grid-cols-2 gap-3">

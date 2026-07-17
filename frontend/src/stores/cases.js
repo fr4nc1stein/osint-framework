@@ -10,6 +10,8 @@ export const useCasesStore = defineStore('cases', {
     caseScansCaseId: null,
     caseGraph: null,
     caseGraphCaseId: null,
+    caseMap: null,
+    caseMapCaseId: null,
     caseEntities: [],
     caseEntitiesCaseId: null,
     caseRelationships: [],
@@ -50,6 +52,8 @@ export const useCasesStore = defineStore('cases', {
           this.caseScansCaseId = null
           this.caseGraph = null
           this.caseGraphCaseId = null
+          this.caseMap = null
+          this.caseMapCaseId = null
           this.caseEntities = []
           this.caseEntitiesCaseId = null
           this.caseRelationships = []
@@ -106,6 +110,13 @@ export const useCasesStore = defineStore('cases', {
       return data
     },
 
+    async fetchCaseMap(caseId) {
+      const { data } = await api.getCaseMap(caseId)
+      this.caseMap = data
+      this.caseMapCaseId = caseId
+      return data
+    },
+
     async fetchCaseEntities(caseId) {
       const { data } = await api.getCaseEntities(caseId)
       this.caseEntities = data
@@ -117,6 +128,7 @@ export const useCasesStore = defineStore('cases', {
       const { data } = await api.createCaseEntity(caseId, payload)
       this.caseEntities.unshift(data)
       await this.fetchCaseGraph(caseId)
+      this.caseMapCaseId = null
       return data
     },
 
@@ -125,6 +137,7 @@ export const useCasesStore = defineStore('cases', {
       const idx = this.caseEntities.findIndex(e => e.id === entityId)
       if (idx !== -1) this.caseEntities.splice(idx, 1, data)
       await this.fetchCaseGraph(caseId)
+      this.caseMapCaseId = null
       return data
     },
 
@@ -132,6 +145,7 @@ export const useCasesStore = defineStore('cases', {
       await api.deleteCaseEntity(caseId, entityId)
       this.caseEntities = this.caseEntities.filter(e => e.id !== entityId)
       await this.fetchCaseGraph(caseId)
+      this.caseMapCaseId = null
     },
 
     async fetchCaseRelationships(caseId) {
@@ -174,18 +188,21 @@ export const useCasesStore = defineStore('cases', {
     async createCaseEvidence(caseId, payload) {
       const { data } = await api.createCaseEvidence(caseId, payload)
       this.caseEvidence.unshift(data)
+      this.caseMapCaseId = null
       return data
     },
 
     async uploadCaseEvidence(caseId, formData) {
       const { data } = await api.uploadCaseEvidence(caseId, formData)
       this.caseEvidence.unshift(data)
+      this.caseMapCaseId = null
       return data
     },
 
     async deleteCaseEvidence(caseId, evidenceId) {
       await api.deleteCaseEvidence(caseId, evidenceId)
       this.caseEvidence = this.caseEvidence.filter(e => e.id !== evidenceId)
+      this.caseMapCaseId = null
     },
 
     async fetchCaseTimeline(caseId, params = undefined) {
@@ -200,6 +217,7 @@ export const useCasesStore = defineStore('cases', {
     async createCaseTimelineEvent(caseId, payload) {
       const { data } = await api.createCaseTimelineEvent(caseId, payload)
       this.caseTimelineEvents.unshift(data)
+      this.caseMapCaseId = null
       return data
     },
 
@@ -207,12 +225,14 @@ export const useCasesStore = defineStore('cases', {
       const { data } = await api.updateCaseTimelineEvent(caseId, eventId, payload)
       const idx = this.caseTimelineEvents.findIndex(e => e.id === eventId)
       if (idx !== -1) this.caseTimelineEvents.splice(idx, 1, data)
+      this.caseMapCaseId = null
       return data
     },
 
     async deleteCaseTimelineEvent(caseId, eventId) {
       await api.deleteCaseTimelineEvent(caseId, eventId)
       this.caseTimelineEvents = this.caseTimelineEvents.filter(e => e.id !== eventId)
+      this.caseMapCaseId = null
     },
 
     async fetchCaseNotes(caseId) {

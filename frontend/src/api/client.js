@@ -30,6 +30,7 @@ export const api = {
   deleteCase: (id) => apiClient.delete(`/api/v1/cases/${id}`),
   getCaseScans: (caseId) => apiClient.get(`/api/v1/cases/${caseId}/scans`),
   getCaseGraph: (caseId) => apiClient.get(`/api/v1/cases/${caseId}/graph`),
+  getCaseMap: (caseId) => apiClient.get(`/api/v1/cases/${caseId}/map`),
   getCaseEntities: (caseId) => apiClient.get(`/api/v1/cases/${caseId}/entities`),
   createCaseEntity: (caseId, data) => apiClient.post(`/api/v1/cases/${caseId}/entities`, data),
   updateCaseEntity: (caseId, entityId, data) => apiClient.put(`/api/v1/cases/${caseId}/entities/${entityId}`, data),
