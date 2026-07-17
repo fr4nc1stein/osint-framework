@@ -441,10 +441,6 @@ osif dns(dns_records) >
 
 ![GeoWifi Hunter](screenshots/geo_wifi.png "Hunting Geolocation of WiFi SSID")
 
-### Web Graph (v1)
-
-![Web Graph](screenshots/web_graph.png "Graph Visualization")
-
 ---
 
 ## Development
