@@ -8,7 +8,16 @@ const props = defineProps({
   evidenceLoading: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['close', 'scan-from-node', 'attach-evidence', 'add-timeline-event', 'preview-evidence', 'download-evidence'])
+const emit = defineEmits([
+  'close',
+  'scan-from-node',
+  'attach-evidence',
+  'add-timeline-event',
+  'preview-evidence',
+  'download-evidence',
+  'edit-location',
+  'open-map-location',
+])
 
 const copied = ref(false)
 
@@ -57,6 +66,17 @@ const displayMeta = computed(() => {
   )
 })
 
+const locationCapableKinds = new Set(['address', 'location', 'office', 'company', 'organization', 'person', 'vehicle'])
+
+const isManualEntity = computed(() => props.node?.graph_node_type === 'entity')
+const canEditLocation = computed(() => isManualEntity.value && locationCapableKinds.has(props.node?.kind))
+const locationMeta = computed(() => props.node?.meta || {})
+const latitude = computed(() => locationMeta.value.latitude ?? locationMeta.value.lat ?? '')
+const longitude = computed(() => locationMeta.value.longitude ?? locationMeta.value.lon ?? locationMeta.value.lng ?? '')
+const hasLocation = computed(() => latitude.value !== '' && longitude.value !== '' && latitude.value != null && longitude.value != null)
+const locationPrecision = computed(() => locationMeta.value.location_precision || locationMeta.value.precision || 'unknown')
+const locationLabel = computed(() => locationMeta.value.address_text || locationMeta.value.address || props.node?.label || props.node?.value)
+
 const KIND_BADGE = {
   domain:       'bg-blue-500/20 text-blue-300',
   person:       'bg-indigo-500/20 text-indigo-300',
@@ -72,6 +92,7 @@ const KIND_BADGE = {
   service:      'bg-cyan-500/20 text-cyan-300',
   email:        'bg-amber-500/20 text-amber-300',
   address:      'bg-rose-500/20 text-rose-300',
+  office:       'bg-rose-500/20 text-rose-300',
   phone:        'bg-purple-500/20 text-purple-300',
   username:     'bg-purple-500/20 text-purple-300',
   social_profile:'bg-yellow-500/20 text-yellow-300',
@@ -155,6 +176,46 @@ const KIND_BADGE = {
               <span class="text-[10px] font-mono break-all" style="color: var(--text-secondary)">{{ val }}</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Location -->
+      <div v-if="canEditLocation" class="px-4 py-3 border-b" style="border-color: var(--border)">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <p class="text-xs font-semibold uppercase tracking-wider" style="color: var(--text-muted)">
+            Location
+          </p>
+          <span class="badge text-[10px]" :class="hasLocation ? 'badge-green' : 'badge-slate'">
+            {{ hasLocation ? 'Mapped' : 'Unmapped' }}
+          </span>
+        </div>
+
+        <div v-if="hasLocation" class="rounded-lg border p-2.5 space-y-2" style="border-color: var(--border); background-color: var(--bg-primary)">
+          <div>
+            <p class="text-xs font-medium truncate" style="color: var(--text-primary)" :title="locationLabel">
+              {{ locationLabel }}
+            </p>
+            <p class="text-[10px] font-mono mt-1" style="color: var(--text-muted)">
+              {{ Number(latitude).toFixed(5) }}, {{ Number(longitude).toFixed(5) }}
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="badge badge-slate text-[9px]">{{ locationPrecision }}</span>
+            <span v-if="node.verification_status" class="badge badge-blue text-[9px]">{{ node.verification_status }}</span>
+          </div>
+        </div>
+
+        <p v-else class="text-xs rounded-lg border p-2.5" style="color: var(--text-muted); border-color: var(--border); background-color: var(--bg-primary)">
+          No mapped location for this node.
+        </p>
+
+        <div class="grid grid-cols-2 gap-2 mt-2">
+          <button class="btn-secondary text-xs" @click="emit('edit-location', node)">
+            {{ hasLocation ? 'Edit Location' : 'Set Location' }}
+          </button>
+          <button class="btn-secondary text-xs" :disabled="!hasLocation" @click="emit('open-map-location', node)">
+            Open Map
+          </button>
         </div>
       </div>
 

@@ -19,7 +19,7 @@ const SECTIONS = [
   { id: 'profiles', title: 'Profiles & URLs',icon: '🔗', kinds: ['profile_url', 'social_profile', 'url'] },
   { id: 'rep',      title: 'Reputation',     icon: '🛡️', kinds: ['reputation', 'category'] },
   { id: 'threats',  title: 'Threats',        icon: '⚠️', kinds: ['breach', 'threat', 'cve'] },
-  { id: 'location', title: 'Location',       icon: '📍', kinds: ['address', 'location'] },
+  { id: 'location', title: 'Location',       icon: '📍', kinds: ['address', 'location', 'office'] },
   { id: 'assets',   title: 'Assets',         icon: '▣', kinds: ['vehicle', 'document'] },
   { id: 'other',    title: 'Other',          icon: '•',  kinds: [] }, // catch-all
 ]
@@ -41,6 +41,7 @@ const KIND_BADGE = {
   service:      'bg-cyan-500/20 text-cyan-300',
   email:        'bg-amber-500/20 text-amber-300',
   address:      'bg-rose-500/20 text-rose-300',
+  office:       'bg-rose-500/20 text-rose-300',
   phone:        'bg-purple-500/20 text-purple-300',
   username:     'bg-purple-500/20 text-purple-300',
   social_profile:'bg-yellow-500/20 text-yellow-300',

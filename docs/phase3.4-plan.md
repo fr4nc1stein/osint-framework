@@ -1,7 +1,7 @@
 # OSIF v2.0 - Phase 3.4 Plan: Skip Tracing, Private Investigation Workspace, Manual Graph, Timeline, Evidence, and Maps
 
 **Date:** 2026-07-14  
-**Status:** In Progress — Phase 3.4A, 3.4B, 3.4C, and 3.4D complete; Phase 3.4E recommended next
+**Status:** In Progress — Phase 3.4A, 3.4B, 3.4C, and 3.4D complete; Phase 3.4E in progress
 **Focus:** Extend cases from automated OSINT scan containers into full investigation workspaces for skip tracing and private investigation workflows.
 
 ---
@@ -718,6 +718,77 @@ Required features:
 - Draw line/path view for chronological movement when supported by evidence.
 - Clear warning for approximate IP geolocation.
 
+### Geolocation Editing And Unmapped Assignment
+
+Phase 3.4E should turn the map from a display-only view into an analyst placement workflow.
+
+Node panel location actions:
+
+- Show a Location section for manual entities that can be mapped.
+- If the node is mapped, show coordinates, precision, source, confidence, and status.
+- If the node is unmapped, show a clear "No mapped location" state.
+- Provide actions:
+  - Set Location
+  - Edit Location
+  - Open on Map
+  - Attach Evidence
+
+Location editor fields:
+
+- map label or address text
+- latitude
+- longitude
+- precision
+- confidence
+- verification status
+- analyst note
+- evidence attachment path
+
+Map panel unmapped workflow:
+
+- Show unmapped location-capable objects with a Map action.
+- Allow an analyst to map an unmapped manual entity by entering coordinates or picking a point.
+- Allow manual markers to be dragged, then require an explicit save path.
+- Keep scan-derived, evidence-derived, and integration-derived markers read-only unless promoted or copied into a manual location observation.
+
+Important investigation rule:
+
+- Geolocation should be treated as an observation with provenance, not just a mutable node attribute.
+- For the current implementation slice, manual entity coordinates can live in `case_entities.properties`.
+- For enterprise use, move location observations into a normalized model so one subject can have multiple addresses, sightings, IP geos, image EXIF points, and suspected regions without overwriting earlier observations.
+
+Recommended enterprise model:
+
+```text
+case_geolocations
+- id
+- case_id
+- target_type
+- target_id
+- latitude
+- longitude
+- address_text
+- precision
+- confidence
+- verification_status
+- source_type
+- source_ref
+- evidence_id
+- notes
+- is_primary
+- created_by
+- created_at
+- updated_at
+```
+
+Triangulation workflow:
+
+- Let analysts select multiple location observations for one subject.
+- Show precision radius for approximate data such as IP geolocation, city-level sightings, or region-only records.
+- Highlight overlap and conflict instead of collapsing everything into one final point.
+- Summarize support such as "3 sources support Toronto" and conflicts such as "1 source indicates Vancouver".
+- Require direct evidence before promoting approximate observations to confirmed physical presence.
+
 ### Geocoding
 
 Geocoding should be optional and provider-configurable.
@@ -1120,21 +1191,33 @@ Before production use, legal and policy requirements should be reviewed for the 
 - [x] Add marker filtering.
 - [x] Add timeline and graph links from map markers.
 
-### Step 5: Leads And Review
+### Step 5: Geolocation Editing And Unmapped Assignment — In Progress
+
+- [x] Mark Phase 3.4D map view complete.
+- [x] Add node-panel location status and actions.
+- [x] Add reusable location editor for manual entities.
+- [x] Add map-side action to map unmapped manual entities.
+- [x] Allow manual map markers to be repositioned with explicit analyst save.
+- [x] Add map-side creation for person, location, and office nodes with coordinate prefill.
+- [ ] Keep scan/evidence/integration-derived map points read-only unless promoted to a manual observation.
+- [ ] Add backend geocoding provider abstraction later, routed through integration settings.
+- [ ] Normalize geolocation observations into `case_geolocations` for enterprise workflows.
+
+### Step 6: Leads And Review
 
 - [ ] Add lead status to manual and scan-derived objects.
 - [ ] Add review queue.
 - [ ] Add promote/reject/merge actions.
 - [ ] Keep automated scan results as leads until confirmed.
 
-### Step 6: Scan From Node
+### Step 7: Scan From Node
 
 - [ ] Add node action menu.
 - [ ] Map entity types to available scan workflows.
 - [ ] Create scan runs from selected node values.
 - [ ] Write scan results back as leads with source metadata.
 
-### Step 7: Dossier And PI Reports
+### Step 8: Dossier And PI Reports
 
 - [ ] Add subject dossier tab.
 - [ ] Add report sections for timeline, evidence, locations, and verified relationships.
@@ -1335,8 +1418,45 @@ Validation completed:
 
 Recommended Plan E:
 
+- Geolocation editing and unmapped assignment:
+  - node-panel location status and actions
+  - reusable location editor for manual entities
+  - map-side unmapped assignment
+  - manual marker drag/reposition workflow
+  - provenance-safe rules for scan/evidence/integration-derived locations
+  - triangulation view for overlapping and conflicting location observations
+
+Recommended Plan F:
+
 - Leads and review workflow:
   - lead board
   - promote/reject/merge actions
   - scan result review queue
   - separation of confirmed facts from unverified leads across graph, map, reports, and dossier
+
+### Plan E — Geolocation Editing And Unmapped Assignment
+
+Implemented the first analyst placement slice:
+
+- Added a Location section to the graph node side panel for manual location-capable entities.
+- The node panel now shows mapped/unmapped state, coordinates, precision, and status.
+- Added Set Location, Edit Location, and Open Map actions for manual entities.
+- Added a reusable case location editor that updates manual entity `properties`:
+  - `address_text`
+  - `latitude`
+  - `longitude`
+  - `location_precision`
+  - `location_note`
+- Added map-side `Map` action for unmapped manual entities.
+- Added Mapbox marker dragging for manual entity markers.
+- Dragging a manual marker opens the same location editor as an explicit save step.
+- Added map-side creation actions for:
+  - person
+  - location
+  - office
+- Map-created nodes reuse the manual node modal and prefill coordinates from either a map click or the current map center.
+- Scan/evidence/integration-derived markers remain non-draggable in this slice.
+
+Validation completed:
+
+- `npm --prefix frontend run build` passed.

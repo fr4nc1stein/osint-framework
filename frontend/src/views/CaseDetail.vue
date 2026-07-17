@@ -31,16 +31,20 @@ const showEntityModal = ref(false)
 const showRelationshipModal = ref(false)
 const showEvidenceModal = ref(false)
 const showTimelineModal = ref(false)
+const showLocationModal = ref(false)
 const entityRelationNode = ref(null)
 const evidenceTarget = ref(null)
 const timelineTarget = ref(null)
+const locationTarget = ref(null)
 const entityForm = ref(defaultEntityForm())
 const relationshipForm = ref(defaultRelationshipForm())
 const evidenceForm = ref(defaultEvidenceForm())
 const timelineForm = ref(defaultTimelineForm())
+const locationForm = ref(defaultLocationForm())
 const evidenceFile = ref(null)
 const evidenceError = ref('')
 const timelineError = ref('')
+const locationError = ref('')
 const selectedNodeEvidence = ref([])
 const selectedNodeEvidenceLoading = ref(false)
 
@@ -64,6 +68,7 @@ watch(
 async function loadCase(id) {
   await casesStore.fetchCase(id)
   await casesStore.fetchCaseScans(id)
+  await casesStore.fetchCaseGraph(id)
   await casesStore.fetchCaseEvidence(id)
   await casesStore.fetchCaseTimeline(id)
   await casesStore.fetchCaseNotes(id)
@@ -85,7 +90,7 @@ const caseMap     = computed(() => casesStore.caseMap)
 const nodeParentScanId = computed(() => resolveNodeParentScanId(scanFromNode.value))
 const graphNodes = computed(() => caseGraph.value?.nodes ?? [])
 const locationEntityOptions = computed(() => graphNodes.value.filter(node => (
-  node.graph_node_type === 'entity' && ['address', 'location', 'company', 'organization', 'person'].includes(node.kind)
+  node.graph_node_type === 'entity' && ['address', 'location', 'office', 'company', 'organization', 'person', 'vehicle'].includes(node.kind)
 )))
 
 // Normalise case graph: the API returns scan_origins on nodes/edges,
@@ -298,6 +303,20 @@ function defaultTimelineForm() {
   }
 }
 
+function defaultLocationForm() {
+  return {
+    entity_id: '',
+    label: '',
+    address_text: '',
+    latitude: '',
+    longitude: '',
+    location_precision: 'unknown',
+    confidence: '0.6',
+    verification_status: 'lead',
+    location_note: '',
+  }
+}
+
 function graphNodeType(node) {
   return node?.graph_node_type ?? (node?.source_type === 'scan' ? 'indicator' : 'entity')
 }
@@ -327,6 +346,105 @@ function timelineTargetId(target) {
 function timelineTargetLabel(target) {
   if (!target) return ''
   return target.__timeline_label || target.__evidence_label || graphNodeLabel(target)
+}
+
+function mapTargetEntityId(target) {
+  if (!target) return null
+  if (target.target_type === 'entity') return target.target_id
+  if (target.graph_node_type === 'entity') return target.id
+  return null
+}
+
+function isManualLocationEntity(node) {
+  return node?.graph_node_type === 'entity'
+    && node?.source_type === 'manual'
+    && ['address', 'location', 'office', 'company', 'organization', 'person', 'vehicle'].includes(node.kind)
+}
+
+async function resolveEntityNode(entityId) {
+  if (!entityId) return null
+  if (casesStore.caseGraphCaseId !== currentCaseId()) {
+    await casesStore.fetchCaseGraph(currentCaseId())
+  }
+  return graphNodes.value.find(node => node.id === entityId) || null
+}
+
+async function openLocationEditor(target, seed = {}) {
+  const entityId = mapTargetEntityId(target)
+  const node = await resolveEntityNode(entityId)
+  if (!isManualLocationEntity(node)) return
+
+  const meta = node.meta || {}
+  locationTarget.value = node
+  locationForm.value = {
+    entity_id: node.id,
+    label: node.label || node.value,
+    address_text: seed.address_text ?? meta.address_text ?? meta.address ?? node.value,
+    latitude: seed.latitude ?? meta.latitude ?? meta.lat ?? '',
+    longitude: seed.longitude ?? meta.longitude ?? meta.lon ?? meta.lng ?? '',
+    location_precision: seed.location_precision ?? meta.location_precision ?? meta.precision ?? 'unknown',
+    confidence: node.confidence == null ? '0.6' : String(node.confidence),
+    verification_status: node.verification_status || 'lead',
+    location_note: meta.location_note || '',
+  }
+  locationError.value = ''
+  showLocationModal.value = true
+}
+
+async function openMapForNode(node) {
+  if (!node) return
+  selectedNode.value = null
+  await switchTab('map')
+}
+
+async function submitLocation() {
+  locationError.value = ''
+  const node = locationTarget.value
+  if (!node) return
+
+  const lat = Number(locationForm.value.latitude)
+  const lon = Number(locationForm.value.longitude)
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+    locationError.value = 'Latitude must be -90 to 90 and longitude must be -180 to 180.'
+    return
+  }
+
+  const properties = { ...(node.meta || {}) }
+  properties.address_text = locationForm.value.address_text || node.value
+  properties.latitude = lat
+  properties.longitude = lon
+  properties.location_precision = locationForm.value.location_precision || 'unknown'
+  if (locationForm.value.location_note) {
+    properties.location_note = locationForm.value.location_note
+  } else {
+    delete properties.location_note
+  }
+
+  const confidence = locationForm.value.confidence === '' ? null : Number(locationForm.value.confidence)
+  await casesStore.updateCaseEntity(currentCaseId(), node.id, {
+    properties,
+    confidence,
+    verification_status: locationForm.value.verification_status,
+  })
+  await casesStore.fetchCaseMap(currentCaseId())
+
+  const updatedNode = graphNodes.value.find(item => item.id === node.id)
+  if (selectedNode.value?.id === node.id && updatedNode) {
+    selectedNode.value = updatedNode
+  }
+
+  showLocationModal.value = false
+  locationTarget.value = null
+}
+
+function handleMarkerMoved(payload) {
+  if (!payload?.marker) return
+  openLocationEditor(payload.marker, {
+    latitude: payload.latitude,
+    longitude: payload.longitude,
+    address_text: payload.marker.address_text,
+    location_precision: payload.marker.precision,
+  })
 }
 
 function mapActionTarget(marker) {
@@ -407,10 +525,14 @@ function nodeById(id) {
   return graphNodes.value.find(node => node.id === id)
 }
 
-function openEntityModal(connectedNode = null) {
+function openEntityModal(connectedNode = null, defaults = {}) {
   entityRelationNode.value = connectedNode
-  entityForm.value = defaultEntityForm()
+  entityForm.value = { ...defaultEntityForm(), ...defaults }
   showEntityModal.value = true
+}
+
+function openMapEntityModal(defaults = {}) {
+  openEntityModal(null, defaults)
 }
 
 function openRelationshipModal(sourceNode = null) {
@@ -863,6 +985,8 @@ function evidenceTimelineTarget(item) {
           @add-timeline-event="openTimelineModal"
           @preview-evidence="previewEvidence"
           @download-evidence="downloadEvidence"
+          @edit-location="openLocationEditor"
+          @open-map-location="openMapForNode"
         />
       </div>
 
@@ -874,6 +998,10 @@ function evidenceTimelineTarget(item) {
           @open-target="openMapTarget"
           @add-evidence="openEvidenceModal(mapActionTarget($event))"
           @add-timeline="openTimelineModal(mapActionTarget($event))"
+          @edit-location="openLocationEditor"
+          @map-unmapped="openLocationEditor"
+          @move-marker="handleMarkerMoved"
+          @create-node="openMapEntityModal"
         />
       </div>
 
@@ -1122,6 +1250,7 @@ function evidenceTimelineTarget(item) {
                 <option value="phone">Phone</option>
                 <option value="address">Address</option>
                 <option value="location">Location</option>
+                <option value="office">Office</option>
                 <option value="social_profile">Social Profile</option>
                 <option value="company">Company</option>
                 <option value="organization">Organization</option>
@@ -1151,7 +1280,7 @@ function evidenceTimelineTarget(item) {
             <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Value *</label>
             <input v-model="entityForm.value" class="input" placeholder="Name, email, phone, address, domain, or identifier" required />
           </div>
-          <div v-if="['address', 'location', 'company', 'organization', 'person', 'vehicle'].includes(entityForm.type)" class="grid grid-cols-2 gap-3">
+          <div v-if="['address', 'location', 'office', 'company', 'organization', 'person', 'vehicle'].includes(entityForm.type)" class="grid grid-cols-2 gap-3">
             <div class="col-span-2">
               <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Map Label</label>
               <input v-model="entityForm.address_text" class="input" placeholder="Address, place name, or location note" />
@@ -1205,6 +1334,84 @@ function evidenceTimelineTarget(item) {
           <div class="flex justify-end gap-3 pt-2">
             <button type="button" class="btn-secondary" @click="showEntityModal = false">Cancel</button>
             <button type="submit" class="btn-primary">{{ entityRelationNode ? 'Create Connected Node' : 'Create Node' }}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- Location modal -->
+  <Teleport to="body">
+    <div v-if="showLocationModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" @click.self="showLocationModal = false">
+      <div class="card p-6 w-full max-w-lg mx-4">
+        <h2 class="text-lg font-semibold mb-1" style="color: var(--text-primary)">Location</h2>
+        <p v-if="locationTarget" class="text-xs mb-4" style="color: var(--text-muted)">
+          {{ locationTarget.kind }} · {{ locationTarget.label || locationTarget.value }}
+        </p>
+        <form @submit.prevent="submitLocation" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Map Label</label>
+            <input v-model="locationForm.address_text" class="input" placeholder="Address, place name, or location note" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Latitude *</label>
+              <input v-model="locationForm.latitude" class="input" type="number" step="any" min="-90" max="90" required />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Longitude *</label>
+              <input v-model="locationForm.longitude" class="input" type="number" step="any" min="-180" max="180" required />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Precision</label>
+              <select v-model="locationForm.location_precision" class="input">
+                <option value="exact">Exact</option>
+                <option value="building">Building</option>
+                <option value="street">Street</option>
+                <option value="city">City</option>
+                <option value="region">Region</option>
+                <option value="country">Country</option>
+                <option value="ip_geo_approximate">IP Geo Approximate</option>
+                <option value="unknown">Unknown</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Status</label>
+              <select v-model="locationForm.verification_status" class="input">
+                <option value="lead">Lead</option>
+                <option value="needs_review">Needs Review</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="rejected">Rejected</option>
+                <option value="stale">Stale</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Confidence</label>
+            <select v-model="locationForm.confidence" class="input">
+              <option value="">Unknown</option>
+              <option value="0.3">Low</option>
+              <option value="0.6">Medium</option>
+              <option value="0.9">High</option>
+              <option value="1">Verified</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Location Note</label>
+            <textarea v-model="locationForm.location_note" class="input h-20 resize-none" placeholder="Evidence, source, or analyst context" />
+          </div>
+
+          <p v-if="locationError" class="text-sm text-red-400">{{ locationError }}</p>
+
+          <div class="flex justify-end gap-3 pt-2">
+            <button type="button" class="btn-secondary" @click="showLocationModal = false">Cancel</button>
+            <button type="submit" class="btn-primary">Save Location</button>
           </div>
         </form>
       </div>

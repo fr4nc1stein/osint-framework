@@ -18,7 +18,7 @@ from app.models.case_relationship import CaseRelationship
 router = APIRouter()
 
 
-LOCATION_KINDS = {"address", "location", "company", "organization", "person", "vehicle"}
+LOCATION_KINDS = {"address", "location", "office", "company", "organization", "person", "vehicle"}
 
 
 def _float_or_none(value) -> float | None:

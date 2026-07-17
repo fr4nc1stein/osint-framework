@@ -1,13 +1,13 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { AlertTriangle, Crosshair, FileImage, MapPin, Route, Search, ShieldCheck } from 'lucide-vue-next'
+import { AlertTriangle, Building2, Crosshair, FileImage, LocateFixed, MapPin, Route, Search, ShieldCheck, UserPlus } from 'lucide-vue-next'
 
 const props = defineProps({
   mapData: { type: Object, default: null },
   loading: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['open-target', 'add-evidence', 'add-timeline'])
+const emit = defineEmits(['open-target', 'add-evidence', 'add-timeline', 'edit-location', 'map-unmapped', 'move-marker', 'create-node'])
 
 const sourceFilter = ref('all')
 const statusFilter = ref('all')
@@ -15,6 +15,7 @@ const typeFilter = ref('all')
 const selectedMarkerId = ref(null)
 const mapEl = ref(null)
 const mapboxError = ref('')
+const createMode = ref(null)
 
 const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || ''
 const mapboxTokenConfigured = Boolean(mapboxToken)
@@ -75,6 +76,12 @@ const pathMarkers = computed(() => {
 
 const pathPoints = computed(() => pathMarkers.value.map(marker => position(marker)).join(' '))
 
+const createModeLabel = computed(() => {
+  if (createMode.value === 'person') return 'Person'
+  if (createMode.value === 'office') return 'Office'
+  return 'Location'
+})
+
 function selectMarker(marker) {
   selectedMarkerId.value = marker.id
 }
@@ -87,6 +94,62 @@ function markerElement(marker) {
   el.setAttribute('aria-label', marker.label)
   el.addEventListener('click', () => selectMarker(marker))
   return el
+}
+
+function canEditMarkerLocation(marker) {
+  return marker?.target_type === 'entity' && marker?.source_type === 'manual'
+}
+
+function mapCenterDraft() {
+  if (mapInstance) {
+    const center = mapInstance.getCenter()
+    return {
+      latitude: Number(center.lat.toFixed(6)),
+      longitude: Number(center.lng.toFixed(6)),
+    }
+  }
+  if (selectedMarker.value) {
+    return {
+      latitude: selectedMarker.value.latitude,
+      longitude: selectedMarker.value.longitude,
+    }
+  }
+  const b = bounds.value
+  if (b) {
+    return {
+      latitude: Number(((b.minLat + b.maxLat) / 2).toFixed(6)),
+      longitude: Number(((b.minLon + b.maxLon) / 2).toFixed(6)),
+    }
+  }
+  return { latitude: '', longitude: '' }
+}
+
+function defaultNodeLabel(type) {
+  if (type === 'person') return 'Person'
+  if (type === 'office') return 'Office'
+  return 'Location'
+}
+
+function createNodeFromMap(type, coords = mapCenterDraft()) {
+  emit('create-node', {
+    type,
+    label: '',
+    value: '',
+    address_text: defaultNodeLabel(type),
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+    location_precision: coords.latitude === '' || coords.longitude === '' ? 'unknown' : 'exact',
+  })
+  createMode.value = null
+}
+
+function beginCreateNode(type) {
+  createMode.value = type
+  logMapbox('create node mode started', { type })
+}
+
+function cancelCreateMode() {
+  createMode.value = null
 }
 
 function clearMapboxMarkers() {
@@ -177,11 +240,26 @@ function syncMapboxMarkers() {
   clearMapboxMarkers()
   logMapbox('syncing markers', { count: filteredMarkers.value.length })
   for (const marker of filteredMarkers.value) {
-    mapboxMarkers.push(
-      new mapboxgl.Marker({ element: markerElement(marker), anchor: 'center' })
-        .setLngLat([marker.longitude, marker.latitude])
-        .addTo(mapInstance)
-    )
+    const mapMarker = new mapboxgl.Marker({
+      element: markerElement(marker),
+      anchor: 'center',
+      draggable: canEditMarkerLocation(marker),
+    })
+      .setLngLat([marker.longitude, marker.latitude])
+      .addTo(mapInstance)
+
+    if (canEditMarkerLocation(marker)) {
+      mapMarker.on('dragend', () => {
+        const lngLat = mapMarker.getLngLat()
+        emit('move-marker', {
+          marker,
+          latitude: Number(lngLat.lat.toFixed(6)),
+          longitude: Number(lngLat.lng.toFixed(6)),
+        })
+      })
+    }
+
+    mapboxMarkers.push(mapMarker)
   }
   if (filteredMarkers.value.length) {
     const b = bounds.value
@@ -267,6 +345,13 @@ async function ensureMapbox() {
           canvasWidth: canvas.width,
           canvasHeight: canvas.height,
           markerCount: mapboxMarkers.length,
+        })
+      })
+      mapInstance.on('click', (event) => {
+        if (!createMode.value) return
+        createNodeFromMap(createMode.value, {
+          latitude: Number(event.lngLat.lat.toFixed(6)),
+          longitude: Number(event.lngLat.lng.toFixed(6)),
         })
       })
       requestAnimationFrame(() => {
@@ -389,7 +474,7 @@ onBeforeUnmount(() => {
           </span>
         </div>
 
-        <div class="mt-4 space-y-2">
+      <div class="mt-4 space-y-2">
           <select v-model="sourceFilter" class="input text-xs">
             <option v-for="option in sourceOptions" :key="option" :value="option">Source: {{ option.replace(/_/g, ' ') }}</option>
           </select>
@@ -399,6 +484,24 @@ onBeforeUnmount(() => {
           <select v-model="typeFilter" class="input text-xs">
             <option v-for="option in typeOptions" :key="option" :value="option">Type: {{ option.replace(/_/g, ' ') }}</option>
           </select>
+        </div>
+
+        <div class="mt-4 pt-4 border-t" style="border-color: var(--border)">
+          <p class="text-xs font-semibold uppercase tracking-wider mb-2" style="color: var(--text-muted)">Add From Map</p>
+          <div class="grid grid-cols-3 gap-2">
+            <button class="btn-secondary text-[10px] px-2 py-2 flex flex-col items-center gap-1" @click="beginCreateNode('person')">
+              <UserPlus class="h-3.5 w-3.5" />
+              Person
+            </button>
+            <button class="btn-secondary text-[10px] px-2 py-2 flex flex-col items-center gap-1" @click="beginCreateNode('location')">
+              <MapPin class="h-3.5 w-3.5" />
+              Location
+            </button>
+            <button class="btn-secondary text-[10px] px-2 py-2 flex flex-col items-center gap-1" @click="beginCreateNode('office')">
+              <Building2 class="h-3.5 w-3.5" />
+              Office
+            </button>
+          </div>
         </div>
       </div>
 
@@ -449,6 +552,20 @@ onBeforeUnmount(() => {
         <span v-if="pathMarkers.length > 1" class="badge badge-green">Movement path {{ pathMarkers.length }}</span>
         <span v-if="warnings.length" class="badge badge-amber">Approximate geolocation</span>
         <span v-if="mapboxError" class="badge badge-red" :title="mapboxError">Mapbox fallback</span>
+      </div>
+
+      <div v-if="createMode" class="absolute top-4 right-4 z-20 w-72 rounded-lg border p-3 shadow-xl" style="border-color: var(--border); background-color: var(--bg-secondary)">
+        <div class="flex items-start gap-2">
+          <LocateFixed class="h-4 w-4 shrink-0 mt-0.5" style="color: var(--text-muted)" />
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium" style="color: var(--text-primary)">Place {{ createModeLabel }}</p>
+            <p class="text-xs mt-1" style="color: var(--text-muted)">Click the map to use that point, or use the current center.</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mt-3">
+          <button class="btn-secondary text-xs" @click="createNodeFromMap(createMode)">Use Center</button>
+          <button class="btn-secondary text-xs" @click="cancelCreateMode">Cancel</button>
+        </div>
       </div>
 
       <button
@@ -533,6 +650,14 @@ onBeforeUnmount(() => {
           <button class="btn-secondary text-xs flex-1" @click="emit('add-timeline', selectedMarker)">Timeline</button>
         </div>
 
+        <button
+          v-if="canEditMarkerLocation(selectedMarker)"
+          class="btn-secondary text-xs w-full"
+          @click="emit('edit-location', selectedMarker)"
+        >
+          Edit Location
+        </button>
+
         <div v-if="warnings.length" class="space-y-2">
           <p class="text-xs font-semibold uppercase tracking-wider" style="color: var(--text-muted)">Warnings</p>
           <div v-for="warning in warnings" :key="warning" class="text-xs rounded-lg border p-2.5 text-amber-200" style="border-color: rgba(245, 158, 11, 0.35); background-color: rgba(245, 158, 11, 0.08)">
@@ -544,8 +669,19 @@ onBeforeUnmount(() => {
           <p class="text-xs font-semibold uppercase tracking-wider mb-2" style="color: var(--text-muted)">Unmapped</p>
           <div class="space-y-2">
             <div v-for="item in unmapped.slice(0, 6)" :key="`${item.target_type}:${item.target_id}`" class="rounded-lg border p-2.5" style="border-color: var(--border); background-color: var(--bg-primary)">
-              <p class="text-xs font-medium" style="color: var(--text-primary)">{{ item.label }}</p>
-              <p class="text-[10px] mt-0.5" style="color: var(--text-muted)">{{ item.entity_type }} · {{ item.reason.replace(/_/g, ' ') }}</p>
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="text-xs font-medium truncate" style="color: var(--text-primary)" :title="item.label">{{ item.label }}</p>
+                  <p class="text-[10px] mt-0.5" style="color: var(--text-muted)">{{ item.entity_type }} · {{ item.reason.replace(/_/g, ' ') }}</p>
+                </div>
+                <button
+                  v-if="item.target_type === 'entity' && item.source_type === 'manual'"
+                  class="btn-secondary text-[10px] px-2 py-1"
+                  @click="emit('map-unmapped', item)"
+                >
+                  Map
+                </button>
+              </div>
             </div>
           </div>
         </div>
