@@ -429,6 +429,22 @@ Module options
 osif dns(dns_records) >
 ```
 
+### Shodan Attack Surface
+
+![Shodan](screenshots/attack_surface_shodan.png "Attack Surface")
+
+### Email Hunter (Hunter.io & Tomba)
+
+![Email Hunter](screenshots/email_hunter.png "Hunting Domain Email")
+
+### GeoWifi Hunter
+
+![GeoWifi Hunter](screenshots/geo_wifi.png "Hunting Geolocation of WiFi SSID")
+
+### Web Graph (v1)
+
+![Web Graph](screenshots/web_graph.png "Graph Visualization")
+
 ---
 
 ## Development
