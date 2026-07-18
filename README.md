@@ -102,7 +102,6 @@ OSIF v2.0 is a complete rewrite of the original CLI tool into a full-stack, API-
 ```bash
 git clone https://github.com/fr4nc1stein/osint-framework osif
 cd osif
-git checkout feature/v2
 ```
 
 ### 2. Configure environment
