@@ -13,12 +13,11 @@ from app.models.scan import Scan
 from app.models.indicator import Indicator
 from app.models.edge import Edge, scan_findings
 from app.models.case_entity import CaseEntity
+from app.models.case_geolocation import CaseGeolocation
 from app.models.case_relationship import CaseRelationship
+from app.services.case_geolocations import APPROXIMATE_PRECISIONS, LOCATION_KINDS
 
 router = APIRouter()
-
-
-LOCATION_KINDS = {"address", "location", "office", "company", "organization", "person", "vehicle"}
 
 
 def _float_or_none(value) -> float | None:
@@ -61,33 +60,58 @@ def _map_bounds(markers: list[dict]) -> dict | None:
     }
 
 
-def _entity_marker(entity: CaseEntity, *, marker_type: str = "entity", context: dict | None = None) -> dict | None:
+def _entity_marker(
+    entity: CaseEntity,
+    geolocation: CaseGeolocation | None = None,
+    *,
+    marker_type: str = "entity",
+    context: dict | None = None,
+) -> dict | None:
     props = entity.properties or {}
-    lat, lon = _coordinates_from(props)
+    if geolocation:
+        lat = float(geolocation.latitude)
+        lon = float(geolocation.longitude)
+    else:
+        lat, lon = _coordinates_from(props)
     if lat is None or lon is None:
         return None
 
-    precision = props.get("precision") or props.get("location_precision") or "unknown"
+    precision = (
+        geolocation.precision
+        if geolocation
+        else props.get("precision") or props.get("location_precision") or "unknown"
+    )
+    source_type = geolocation.source_type if geolocation else entity.source_type
+    verification_status = geolocation.verification_status if geolocation else entity.verification_status
+    confidence = geolocation.confidence if geolocation and geolocation.confidence is not None else entity.confidence
+    can_edit_location = (
+        marker_type == "entity"
+        and entity.source_type == "manual"
+        and (not geolocation or geolocation.source_type == "manual")
+    )
     marker = {
-        "id": f"{marker_type}:{entity.id}",
+        "id": f"{marker_type}:{geolocation.id if geolocation else entity.id}",
         "marker_type": marker_type,
         "target_type": "entity",
         "target_id": str(entity.id),
-        "label": entity.label or entity.value,
+        "geolocation_id": str(geolocation.id) if geolocation else None,
+        "label": (geolocation.label if geolocation else None) or entity.label or entity.value,
         "description": entity.description,
         "entity_type": entity.type,
-        "address_text": props.get("address_text") or props.get("address") or entity.value,
+        "address_text": (geolocation.address_text if geolocation else None) or props.get("address_text") or props.get("address") or entity.value,
         "latitude": lat,
         "longitude": lon,
         "precision": precision,
-        "approximate": precision in {"city", "region", "country", "ip_geo_approximate", "unknown"},
-        "confidence": float(entity.confidence) if entity.confidence is not None else None,
-        "verification_status": entity.verification_status,
-        "source_type": entity.source_type,
-        "source_ref": entity.source_ref,
+        "approximate": precision in APPROXIMATE_PRECISIONS,
+        "confidence": float(confidence) if confidence is not None else None,
+        "verification_status": verification_status,
+        "source_type": source_type,
+        "source_ref": geolocation.source_ref if geolocation else entity.source_ref,
+        "geocoding_source": geolocation.geocoding_source if geolocation else props.get("geocoding_source"),
+        "can_edit_location": can_edit_location,
         "created_at": _iso(entity.created_at),
-        "updated_at": _iso(entity.updated_at),
-        "properties": props,
+        "updated_at": _iso(geolocation.updated_at if geolocation else entity.updated_at),
+        "properties": {**props, **({"geolocation": geolocation.meta or {}} if geolocation else {})},
         "links": [{"target_type": "entity", "target_id": str(entity.id), "label": entity.label or entity.value}],
     }
     if context:
@@ -258,8 +282,24 @@ async def get_case_map(
     entities = result.scalars().all()
     entity_index = {entity.id: entity for entity in entities}
 
+    result = await db.execute(
+        select(CaseGeolocation)
+        .where(CaseGeolocation.case_id == case_id)
+        .order_by(CaseGeolocation.is_primary.desc(), CaseGeolocation.created_at.desc())
+    )
+    geolocations = result.scalars().all()
+    primary_entity_geos: dict[uuid.UUID, CaseGeolocation] = {}
+    extra_entity_geos: list[CaseGeolocation] = []
+    for geo in geolocations:
+        if geo.target_type != "entity":
+            continue
+        if geo.is_primary and geo.target_id not in primary_entity_geos:
+            primary_entity_geos[geo.target_id] = geo
+        else:
+            extra_entity_geos.append(geo)
+
     for entity in entities:
-        marker = _entity_marker(entity)
+        marker = _entity_marker(entity, primary_entity_geos.get(entity.id))
         if marker:
             markers.append(marker)
         elif entity.type in LOCATION_KINDS:
@@ -272,6 +312,24 @@ async def get_case_map(
                 "source_type": entity.source_type,
                 "verification_status": entity.verification_status,
             })
+
+    for geo in extra_entity_geos:
+        entity = entity_index.get(geo.target_id)
+        if not entity:
+            continue
+        marker = _entity_marker(
+            entity,
+            geo,
+            marker_type="geolocation",
+            context={
+                "links": [
+                    {"target_type": "entity", "target_id": str(entity.id), "label": entity.label or entity.value},
+                    {"target_type": "geolocation", "target_id": str(geo.id), "label": geo.label or geo.address_text},
+                ],
+            },
+        )
+        if marker:
+            markers.append(marker)
 
     result = await db.execute(
         select(Evidence)
@@ -301,6 +359,9 @@ async def get_case_map(
                 "verification_status": item.chain_of_custody_status,
                 "source_type": item.source_type,
                 "source_ref": item.source_url,
+                "geolocation_id": None,
+                "geocoding_source": (item.meta or {}).get("geocoding_source"),
+                "can_edit_location": False,
                 "created_at": _iso(item.created_at),
                 "updated_at": _iso(item.updated_at),
                 "properties": item.meta or {},
@@ -347,6 +408,7 @@ async def get_case_map(
             continue
         marker = _entity_marker(
             entity,
+            primary_entity_geos.get(entity.id),
             marker_type="timeline_event",
             context={
                 "id": f"timeline_event:{event.id}",
@@ -359,6 +421,7 @@ async def get_case_map(
                 "verification_status": event.verification_status,
                 "source_type": event.source_type,
                 "source_ref": event.source_ref,
+                "can_edit_location": False,
                 "occurred_at": _iso(event.occurred_at or event.start_at),
                 "links": [
                     {"target_type": "timeline_event", "target_id": str(event.id), "label": event.title},
@@ -436,6 +499,9 @@ async def get_case_map(
                 "source_type": "scan",
                 "source_module": edge.source_module,
                 "source_ref": scan.seed_value if scan else None,
+                "geolocation_id": None,
+                "geocoding_source": None,
+                "can_edit_location": False,
                 "created_at": _iso(edge.created_at),
                 "properties": edge.evidence or {},
                 "links": [

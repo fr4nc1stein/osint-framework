@@ -11,6 +11,7 @@ from app.models.ai_setting import AISetting
 from app.models.case_entity import CaseEntity
 from app.models.case_relationship import CaseRelationship
 from app.models.case_timeline import CaseTimelineEvent, CaseTimelineLink
+from app.models.case_geolocation import CaseGeolocation
 
 __all__ = [
     "Case",
@@ -27,4 +28,5 @@ __all__ = [
     "CaseRelationship",
     "CaseTimelineEvent",
     "CaseTimelineLink",
+    "CaseGeolocation",
 ]

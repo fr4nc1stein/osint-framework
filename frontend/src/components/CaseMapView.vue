@@ -89,7 +89,7 @@ function selectMarker(marker) {
 function markerElement(marker) {
   const el = document.createElement('button')
   el.type = 'button'
-  el.className = `mapbox-marker-button ${marker.marker_type === 'evidence' ? 'is-evidence' : marker.marker_type === 'timeline_event' ? 'is-timeline' : marker.source_type === 'scan' ? 'is-scan' : 'is-manual'}`
+  el.className = `mapbox-marker-button ${marker.marker_type === 'evidence' ? 'is-evidence' : marker.marker_type === 'timeline_event' ? 'is-timeline' : marker.marker_type === 'geolocation' ? 'is-geolocation' : marker.source_type === 'scan' ? 'is-scan' : 'is-manual'}`
   el.title = marker.label
   el.setAttribute('aria-label', marker.label)
   el.addEventListener('click', () => selectMarker(marker))
@@ -97,7 +97,7 @@ function markerElement(marker) {
 }
 
 function canEditMarkerLocation(marker) {
-  return marker?.target_type === 'entity' && marker?.source_type === 'manual'
+  return marker?.target_type === 'entity' && marker?.can_edit_location === true
 }
 
 function mapCenterDraft() {
@@ -406,6 +406,7 @@ function pointStyle(marker) {
 function markerClass(marker) {
   if (marker.marker_type === 'evidence') return 'border-cyan-300 bg-cyan-400 text-cyan-950'
   if (marker.marker_type === 'timeline_event') return 'border-emerald-300 bg-emerald-400 text-emerald-950'
+  if (marker.marker_type === 'geolocation') return 'border-violet-300 bg-violet-400 text-violet-950'
   if (marker.source_type === 'scan') return 'border-amber-300 bg-amber-400 text-amber-950'
   if (marker.verification_status === 'confirmed') return 'border-blue-300 bg-blue-400 text-blue-950'
   if (marker.verification_status === 'rejected') return 'border-red-300 bg-red-400 text-red-950'
@@ -415,6 +416,7 @@ function markerClass(marker) {
 function markerIcon(marker) {
   if (marker.marker_type === 'evidence') return FileImage
   if (marker.marker_type === 'timeline_event') return Route
+  if (marker.marker_type === 'geolocation') return LocateFixed
   if (marker.source_type === 'scan') return Crosshair
   if (marker.verification_status === 'confirmed') return ShieldCheck
   return MapPin
@@ -723,5 +725,9 @@ onBeforeUnmount(() => {
 
 :deep(.mapbox-marker-button.is-timeline) {
   background: #34d399;
+}
+
+:deep(.mapbox-marker-button.is-geolocation) {
+  background: #a78bfa;
 }
 </style>

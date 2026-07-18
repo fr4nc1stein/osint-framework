@@ -88,3 +88,8 @@ class Case(Base):
         back_populates="case",
         cascade="all, delete-orphan"
     )
+    geolocations: Mapped[List["CaseGeolocation"]] = relationship(
+        "CaseGeolocation",
+        back_populates="case",
+        cascade="all, delete-orphan"
+    )

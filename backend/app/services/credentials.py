@@ -23,6 +23,11 @@ PROVIDER_ENV_MAP: dict[str, str] = {
     "alienvault": "ALIENVAULT_API_KEY",
     "censys":     "CENSYS_API_KEY",
     "urlscan":    "URLSCAN_API_KEY",
+    "mapbox":     "MAPBOX_TOKEN",
+}
+
+PROVIDER_ENV_FALLBACKS: dict[str, list[str]] = {
+    "mapbox": ["VITE_MAPBOX_TOKEN"],
 }
 
 _CACHE_TTL = int(os.getenv("CRED_CACHE_TTL", "60"))
@@ -31,6 +36,18 @@ _CACHE_TTL = int(os.getenv("CRED_CACHE_TTL", "60"))
 async def _get_redis():
     from app.core.redis import get_redis
     return await get_redis()
+
+
+def get_env_api_key(provider: str) -> Optional[str]:
+    """Return provider key from preferred env var or approved compatibility aliases."""
+    env_names = [PROVIDER_ENV_MAP.get(provider), *PROVIDER_ENV_FALLBACKS.get(provider, [])]
+    for env_name in env_names:
+        if not env_name:
+            continue
+        value = os.getenv(env_name)
+        if value:
+            return value
+    return None
 
 
 async def get_api_key(provider: str, db: AsyncSession) -> Optional[str]:
@@ -71,11 +88,9 @@ async def get_api_key(provider: str, db: AsyncSession) -> Optional[str]:
         pass
 
     # 3. .env fallback
-    env_var = PROVIDER_ENV_MAP.get(provider)
-    if env_var:
-        value = os.getenv(env_var)
-        if value:
-            return value
+    value = get_env_api_key(provider)
+    if value:
+        return value
 
     return None
 
@@ -103,8 +118,7 @@ async def get_source(provider: str, db: AsyncSession) -> str:
     except Exception:
         pass
 
-    env_var = PROVIDER_ENV_MAP.get(provider)
-    if env_var and os.getenv(env_var):
+    if get_env_api_key(provider):
         return "env_fallback"
 
     return "unconfigured"

@@ -14,7 +14,7 @@ from app.core.database import get_db
 from app.core.crypto import encrypt, mask_hint, decrypt
 from app.models.integration_credential import IntegrationCredential
 from app.schemas.integration import IntegrationSave, IntegrationResponse
-from app.services.credentials import PROVIDER_ENV_MAP, get_api_key, invalidate_cache
+from app.services.credentials import PROVIDER_ENV_MAP, get_api_key, get_env_api_key, invalidate_cache
 
 router = APIRouter()
 
@@ -31,6 +31,7 @@ CATALOG = [
     {"id": "alienvault",  "name": "AlienVault OTX",   "description": "Open threat intelligence platform",     "category": "threat"},
     {"id": "censys",      "name": "Censys",            "description": "Internet-wide scanning & certificates", "category": "recon"},
     {"id": "urlscan",     "name": "URLScan.io",        "description": "URL & domain sandbox scanning",        "category": "threat"},
+    {"id": "mapbox",      "name": "Mapbox",            "description": "Explicit-consent geocoding for case maps", "category": "geocoding"},
 ]
 
 CATALOG_MAP = {c["id"]: c for c in CATALOG}
@@ -66,6 +67,15 @@ async def _test_provider(provider: str, api_key: str) -> tuple[str, str]:
             elif provider == "urlscan":
                 r = await client.get("https://urlscan.io/api/v1/user/quotas/",
                                      headers={"API-Key": api_key})
+                if r.status_code == 200:
+                    return "ok", "Connected successfully"
+                return "fail", f"HTTP {r.status_code}"
+
+            elif provider == "mapbox":
+                r = await client.get(
+                    "https://api.mapbox.com/geocoding/v5/mapbox.places/Toronto.json",
+                    params={"access_token": api_key, "limit": 1},
+                )
                 if r.status_code == 200:
                     return "ok", "Connected successfully"
                 return "fail", f"HTTP {r.status_code}"
@@ -138,7 +148,7 @@ async def _get_or_create(provider: str, db: AsyncSession) -> IntegrationCredenti
 
 def _build_response(cred: Optional[IntegrationCredential], meta: dict, env_var: str) -> dict:
     """Merge DB row + catalog meta into a safe response dict."""
-    env_configured = bool(os.getenv(env_var))
+    env_configured = bool(get_env_api_key(meta["id"]) or os.getenv(env_var))
 
     if cred and cred.encrypted_key:
         has_key = True
@@ -273,7 +283,7 @@ async def import_from_env(db: AsyncSession = Depends(get_db)):
     """One-time import of .env API keys into the DB."""
     imported = []
     for provider, env_var in PROVIDER_ENV_MAP.items():
-        value = os.getenv(env_var)
+        value = get_env_api_key(provider) or os.getenv(env_var)
         if not value:
             continue
         cred = await _get_or_create(provider, db)

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.case import Case
 from app.models.case_entity import CaseEntity
+from app.models.case_geolocation import CaseGeolocation
 from app.models.case_relationship import CaseRelationship
 from app.models.edge import Edge, scan_findings
 from app.models.indicator import Indicator
@@ -19,6 +20,7 @@ from app.schemas.case_relationship import (
     CaseRelationshipResponse,
     CaseRelationshipUpdate,
 )
+from app.services.case_geolocations import upsert_entity_primary_geolocation
 
 router = APIRouter()
 
@@ -104,6 +106,7 @@ async def create_entity(
     entity = CaseEntity(case_id=case_id, **data)
     db.add(entity)
     await db.flush()
+    await upsert_entity_primary_geolocation(db, entity)
 
     has_connected_node = bool(entity_data.connected_to_node_type and entity_data.connected_to_node_id)
     if entity_data.relationship_type and not has_connected_node:
@@ -156,6 +159,7 @@ async def update_entity(
 
     for field, value in entity_data.model_dump(exclude_unset=True).items():
         setattr(entity, field, value)
+    await upsert_entity_primary_geolocation(db, entity)
 
     await db.commit()
     await db.refresh(entity)
@@ -183,6 +187,13 @@ async def delete_entity(
                 (CaseRelationship.from_node_type == "entity") & (CaseRelationship.from_node_id == entity_id),
                 (CaseRelationship.to_node_type == "entity") & (CaseRelationship.to_node_id == entity_id),
             ),
+        )
+    )
+    await db.execute(
+        delete(CaseGeolocation).where(
+            CaseGeolocation.case_id == case_id,
+            CaseGeolocation.target_type == "entity",
+            CaseGeolocation.target_id == entity_id,
         )
     )
     await db.delete(entity)

@@ -12,6 +12,8 @@ export const useCasesStore = defineStore('cases', {
     caseGraphCaseId: null,
     caseMap: null,
     caseMapCaseId: null,
+    caseGeolocations: [],
+    caseGeolocationsCaseId: null,
     caseEntities: [],
     caseEntitiesCaseId: null,
     caseRelationships: [],
@@ -54,6 +56,8 @@ export const useCasesStore = defineStore('cases', {
           this.caseGraphCaseId = null
           this.caseMap = null
           this.caseMapCaseId = null
+          this.caseGeolocations = []
+          this.caseGeolocationsCaseId = null
           this.caseEntities = []
           this.caseEntitiesCaseId = null
           this.caseRelationships = []
@@ -114,6 +118,44 @@ export const useCasesStore = defineStore('cases', {
       const { data } = await api.getCaseMap(caseId)
       this.caseMap = data
       this.caseMapCaseId = caseId
+      return data
+    },
+
+    async fetchCaseGeolocations(caseId, params = undefined) {
+      const { data } = await api.getCaseGeolocations(caseId, params)
+      if (!params?.target_type && !params?.target_id) {
+        this.caseGeolocations = data
+        this.caseGeolocationsCaseId = caseId
+      }
+      return data
+    },
+
+    async createCaseGeolocation(caseId, payload) {
+      const { data } = await api.createCaseGeolocation(caseId, payload)
+      this.caseGeolocations.unshift(data)
+      this.caseMapCaseId = null
+      await this.fetchCaseGraph(caseId)
+      return data
+    },
+
+    async updateCaseGeolocation(caseId, geolocationId, payload) {
+      const { data } = await api.updateCaseGeolocation(caseId, geolocationId, payload)
+      const idx = this.caseGeolocations.findIndex(g => g.id === geolocationId)
+      if (idx !== -1) this.caseGeolocations.splice(idx, 1, data)
+      this.caseMapCaseId = null
+      await this.fetchCaseGraph(caseId)
+      return data
+    },
+
+    async deleteCaseGeolocation(caseId, geolocationId) {
+      await api.deleteCaseGeolocation(caseId, geolocationId)
+      this.caseGeolocations = this.caseGeolocations.filter(g => g.id !== geolocationId)
+      this.caseMapCaseId = null
+      await this.fetchCaseGraph(caseId)
+    },
+
+    async geocodeCaseAddress(caseId, payload) {
+      const { data } = await api.geocodeCaseAddress(caseId, payload)
       return data
     },
 
