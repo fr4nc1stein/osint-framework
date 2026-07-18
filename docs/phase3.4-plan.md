@@ -1489,6 +1489,16 @@ Implemented the lead review foundation:
 - Scan-derived indicators and graph edges now default to `needs_review` instead of `confirmed`.
 - Rejected scan-derived indicators and edges are hidden from the default case graph.
 - Rejected manual entities and relationships are hidden from the default case graph.
+- Promoted or merged scan indicators now preserve their scan-derived graph relationships by rewiring visible case graph edges to the promoted/merged case entity.
+- Leads tab graph jumps now follow promoted/merged indicators to the visible case entity instead of the replaced scan indicator.
+- Rejected map-capable leads are hidden from the default map view, including:
+  - rejected manual entities
+  - rejected geolocation observations
+  - rejected timeline events
+  - rejected scan indicators
+  - rejected scan graph edges
+  - evidence markers linked only to hidden/rejected targets
+- The map endpoint keeps `include_rejected=true` support for audit/debug review of hidden rejected markers.
 - Review actions support:
   - confirm
   - reject
@@ -1518,3 +1528,5 @@ Validation completed:
 - `docker compose -f docker-compose.dev.yml exec -T backend alembic upgrade head` applied migration `e24a5fd8b0ce`.
 - API smoke test created a temporary manual lead, listed it in the queue, confirmed it, verified it left the open queue, verified it appeared in confirmed leads, then deleted the temporary case.
 - API smoke test inserted a temporary scan finding, verified scan indicators/edges appeared as open leads, rejected a scan indicator, verified the default graph hid the rejected scan-derived path, then deleted the temporary case.
+- API smoke test promoted a temporary scan indicator, verified the promoted case entity remained connected to the scan-derived edge, verified the original indicator was hidden from the default graph, then deleted the temporary case.
+- API smoke test rejected a temporary scan-derived location indicator, verified the default map marker disappeared, verified `include_rejected=true` still returned the marker, then deleted the temporary case.

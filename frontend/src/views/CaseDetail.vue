@@ -757,7 +757,8 @@ async function openLeadInGraph(lead) {
   if (casesStore.caseGraphCaseId !== currentCaseId()) {
     await casesStore.fetchCaseGraph(currentCaseId())
   }
-  const node = graphNodes.value.find(item => item.id === lead.target_id)
+  const visibleNodeId = lead.merged_entity_id || lead.promoted_entity_id || lead.target_id
+  const node = graphNodes.value.find(item => item.id === visibleNodeId)
   if (node) {
     activeTab.value = 'graph'
     onNodeSelect(node)

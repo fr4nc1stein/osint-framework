@@ -148,6 +148,29 @@ async def get_case_graph(
         if target_type == "indicator" and review.review_status == "rejected"
     }
 
+    result = await db.execute(
+        select(CaseEntity).where(CaseEntity.case_id == case_id).order_by(CaseEntity.created_at)
+    )
+    manual_entities = result.scalars().all()
+    hidden_manual_entity_ids = {
+        entity.id for entity in manual_entities
+        if entity.verification_status == "rejected" and not include_rejected
+    }
+    visible_manual_entity_ids = {
+        entity.id for entity in manual_entities
+        if include_rejected or entity.id not in hidden_manual_entity_ids
+    }
+    indicator_replacements = {
+        target_id: replacement_id
+        for (target_type, target_id), review in review_map.items()
+        for replacement_id in [review.merged_entity_id or review.promoted_entity_id]
+        if (
+            target_type == "indicator"
+            and review.review_status == "confirmed"
+            and replacement_id in visible_manual_entity_ids
+        )
+    }
+
     # Build edge map and collect indicator ids, tracking which scans each edge appears in
     edge_map: dict[uuid.UUID, dict] = {}
     indicator_scan_map: dict[uuid.UUID, set] = {}
@@ -167,11 +190,15 @@ async def get_case_graph(
                 continue
             if not include_rejected and (edge.src_id in rejected_indicators or edge.dst_id in rejected_indicators):
                 continue
+            source_id = indicator_replacements.get(edge.src_id, edge.src_id)
+            target_id = indicator_replacements.get(edge.dst_id, edge.dst_id)
+            if source_id == target_id:
+                continue
             if edge.id not in edge_map:
                 edge_map[edge.id] = {
                     "id": str(edge.id),
-                    "source": str(edge.src_id),
-                    "target": str(edge.dst_id),
+                    "source": str(source_id),
+                    "target": str(target_id),
                     "relationship": edge.relationship_type,
                     "confidence": float(edge.confidence),
                     "source_module": edge.source_module,
@@ -181,6 +208,10 @@ async def get_case_graph(
                     "merged_entity_id": str(edge_review.merged_entity_id) if edge_review and edge_review.merged_entity_id else None,
                     "evidence": edge.evidence,
                     "scan_origins": [],
+                    "rewired_from": {
+                        "source": str(edge.src_id),
+                        "target": str(edge.dst_id),
+                    } if source_id != edge.src_id or target_id != edge.dst_id else None,
                 }
             scan_label = scan_index[scan_id]["seed_value"]
             if scan_label not in edge_map[edge.id]["scan_origins"]:
@@ -203,6 +234,8 @@ async def get_case_graph(
         review = review_map.get(("indicator", ind.id))
         if review and review.review_status == "rejected" and not include_rejected:
             continue
+        if ind.id in indicator_replacements and not include_rejected:
+            continue
         nodes.append({
             "id": str(ind.id),
             "graph_node_type": "indicator",
@@ -218,14 +251,6 @@ async def get_case_graph(
             "scan_origins": [scan_index[sid]["seed_value"] for sid in indicator_scan_map.get(ind.id, [])],
         })
 
-    result = await db.execute(
-        select(CaseEntity).where(CaseEntity.case_id == case_id).order_by(CaseEntity.created_at)
-    )
-    manual_entities = result.scalars().all()
-    hidden_manual_entity_ids = {
-        entity.id for entity in manual_entities
-        if entity.verification_status == "rejected" and not include_rejected
-    }
     nodes.extend(
         {
             "id": str(entity.id),
@@ -297,6 +322,7 @@ async def get_case_graph(
 @router.get("/{case_id}/map")
 async def get_case_map(
     case_id: uuid.UUID,
+    include_rejected: bool = Query(default=False),
     db: AsyncSession = Depends(get_db)
 ):
     """Return normalized map markers for a case without exposing map provider details."""
@@ -308,18 +334,57 @@ async def get_case_map(
     unmapped: list[dict] = []
     warnings: list[str] = []
 
+    result = await db.execute(select(CaseLeadReview).where(CaseLeadReview.case_id == case_id))
+    review_map = {(review.target_type, review.target_id): review for review in result.scalars().all()}
+    rejected_indicators = {
+        target_id
+        for (target_type, target_id), review in review_map.items()
+        if target_type == "indicator" and review.review_status == "rejected"
+    }
+    rejected_graph_edges = {
+        target_id
+        for (target_type, target_id), review in review_map.items()
+        if target_type == "graph_edge" and review.review_status == "rejected"
+    }
+
     result = await db.execute(
         select(CaseEntity).where(CaseEntity.case_id == case_id).order_by(CaseEntity.created_at)
     )
     entities = result.scalars().all()
-    entity_index = {entity.id: entity for entity in entities}
+    hidden_entity_ids = {
+        entity.id
+        for entity in entities
+        if entity.verification_status == "rejected" and not include_rejected
+    }
+    visible_entities = [entity for entity in entities if include_rejected or entity.id not in hidden_entity_ids]
+    entity_index = {entity.id: entity for entity in visible_entities}
+
+    def target_is_hidden(target_type: str, target_id: uuid.UUID) -> bool:
+        if include_rejected:
+            return False
+        if target_type == "entity":
+            return target_id in hidden_entity_ids
+        if target_type == "indicator":
+            return target_id in rejected_indicators
+        if target_type == "graph_edge":
+            return target_id in rejected_graph_edges
+        return False
 
     result = await db.execute(
         select(CaseGeolocation)
         .where(CaseGeolocation.case_id == case_id)
         .order_by(CaseGeolocation.is_primary.desc(), CaseGeolocation.created_at.desc())
     )
-    geolocations = result.scalars().all()
+    geolocations = [
+        geo for geo in result.scalars().all()
+        if (
+            include_rejected
+            or (
+                geo.verification_status != "rejected"
+                and not target_is_hidden(geo.target_type, geo.target_id)
+            )
+        )
+    ]
     primary_entity_geos: dict[uuid.UUID, CaseGeolocation] = {}
     extra_entity_geos: list[CaseGeolocation] = []
     for geo in geolocations:
@@ -330,7 +395,7 @@ async def get_case_map(
         else:
             extra_entity_geos.append(geo)
 
-    for entity in entities:
+    for entity in visible_entities:
         marker = _entity_marker(entity, primary_entity_geos.get(entity.id))
         if marker:
             markers.append(marker)
@@ -371,6 +436,14 @@ async def get_case_map(
     )
     evidence_items = result.scalars().unique().all()
     for item in evidence_items:
+        if item.chain_of_custody_status == "rejected" and not include_rejected:
+            continue
+        visible_links = [
+            link for link in item.links
+            if not target_is_hidden(link.target_type, link.target_id)
+        ]
+        if item.links and not visible_links and not include_rejected:
+            continue
         lat, lon = _coordinates_from(item.meta or {})
         if lat is not None and lon is not None:
             precision = (item.meta or {}).get("precision") or "unknown"
@@ -401,7 +474,7 @@ async def get_case_map(
                     {"target_type": "evidence", "target_id": str(item.id), "label": item.title},
                     *[
                         {"target_type": link.target_type, "target_id": str(link.target_id), "label": link.relationship_note}
-                        for link in item.links
+                        for link in visible_links
                     ],
                 ],
             })
@@ -424,20 +497,27 @@ async def get_case_map(
     )
     timeline_events = result.scalars().unique().all()
     for event in timeline_events:
+        if event.verification_status == "rejected" and not include_rejected:
+            continue
         if not event.location_entity_id:
             continue
         entity = entity_index.get(event.location_entity_id)
         if not entity:
-            unmapped.append({
-                "target_type": "timeline_event",
-                "target_id": str(event.id),
-                "label": event.title,
-                "entity_type": event.event_type,
-                "reason": "missing_location_entity",
-                "source_type": event.source_type,
-                "verification_status": event.verification_status,
-            })
+            if include_rejected:
+                unmapped.append({
+                    "target_type": "timeline_event",
+                    "target_id": str(event.id),
+                    "label": event.title,
+                    "entity_type": event.event_type,
+                    "reason": "missing_location_entity",
+                    "source_type": event.source_type,
+                    "verification_status": event.verification_status,
+                })
             continue
+        visible_event_links = [
+            link for link in event.links
+            if not target_is_hidden(link.target_type, link.target_id)
+        ]
         marker = _entity_marker(
             entity,
             primary_entity_geos.get(entity.id),
@@ -460,7 +540,7 @@ async def get_case_map(
                     {"target_type": "entity", "target_id": str(entity.id), "label": entity.label or entity.value},
                     *[
                         {"target_type": link.target_type, "target_id": str(link.target_id), "label": None}
-                        for link in event.links
+                        for link in visible_event_links
                     ],
                 ],
             },
@@ -501,9 +581,16 @@ async def get_case_map(
 
         seen_scan_markers: set[tuple[str, str, float, float]] = set()
         for edge, scan_id in edge_rows:
+            if not include_rejected and (
+                edge.id in rejected_graph_edges
+                or edge.src_id in rejected_indicators
+                or edge.dst_id in rejected_indicators
+            ):
+                continue
             lat, lon = _coordinates_from(edge.evidence or {})
             if lat is None or lon is None:
                 continue
+            edge_review = review_map.get(("graph_edge", edge.id))
             scan = scan_index.get(scan_id)
             dst = indicator_index.get(edge.dst_id)
             src = indicator_index.get(edge.src_id)
@@ -527,7 +614,7 @@ async def get_case_map(
                 "precision": "ip_geo_approximate" if edge.source_module == "ip_geolocation" else "unknown",
                 "approximate": True,
                 "confidence": float(edge.confidence) if edge.confidence is not None else None,
-                "verification_status": "needs_review",
+                "verification_status": edge_review.review_status if edge_review else "needs_review",
                 "source_type": "scan",
                 "source_module": edge.source_module,
                 "source_ref": scan.seed_value if scan else None,
