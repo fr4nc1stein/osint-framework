@@ -1,7 +1,7 @@
 """Scan ORM Model"""
 from datetime import datetime
 from typing import List
-from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, ARRAY
+from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, ARRAY, Index
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -32,6 +32,13 @@ class Scan(Base):
     # Seed information
     seed_value: Mapped[str] = mapped_column(Text, nullable=False)
     seed_kind: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    # Launch provenance
+    launch_source: Mapped[str] = mapped_column(String(30), default="manual", server_default="manual", nullable=False)
+    source_node_type: Mapped[str | None] = mapped_column(String(30))
+    source_node_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    source_node_label: Mapped[str | None] = mapped_column(Text)
+    source_context: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}", nullable=False)
 
     # Module configuration
     modules: Mapped[List[str]] = mapped_column(ARRAY(Text), nullable=False)
@@ -65,4 +72,8 @@ class Scan(Base):
     )
     children: Mapped[List["Scan"]] = relationship(
         "Scan", back_populates="parent", foreign_keys="Scan.parent_scan_id"
+    )
+
+    __table_args__ = (
+        Index("idx_scans_source_node", "case_id", "source_node_type", "source_node_id"),
     )

@@ -309,7 +309,17 @@ async def get_case_graph(
         "nodes": nodes,
         "edges": [*edge_map.values(), *manual_edges],
         "scans": [
-            {"id": str(s.id), "seed_value": s.seed_value, "seed_kind": s.seed_kind, "status": s.status}
+            {
+                "id": str(s.id),
+                "seed_value": s.seed_value,
+                "seed_kind": s.seed_kind,
+                "status": s.status,
+                "launch_source": s.launch_source,
+                "source_node_type": s.source_node_type,
+                "source_node_id": str(s.source_node_id) if s.source_node_id else None,
+                "source_node_label": s.source_node_label,
+                "source_context": s.source_context or {},
+            }
             for s in scans
         ],
         "manual_counts": {
@@ -675,6 +685,11 @@ async def list_case_scans(
             "seed_kind": s.seed_kind,
             "modules": s.modules,
             "status": s.status,
+            "launch_source": s.launch_source,
+            "source_node_type": s.source_node_type,
+            "source_node_id": str(s.source_node_id) if s.source_node_id else None,
+            "source_node_label": s.source_node_label,
+            "source_context": s.source_context or {},
             "progress": s.progress,
             "total_modules": s.total_modules,
             "module_statuses": s.module_statuses,

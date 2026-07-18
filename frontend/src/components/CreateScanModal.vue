@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useModulesStore } from '../stores/modules'
 import { useScansStore } from '../stores/scans'
@@ -10,6 +10,7 @@ const props = defineProps({
   defaultKind:    { type: String, default: 'domain' },
   parentScanId:   { type: String, default: null },
   suggestedModules: { type: Array, default: () => [] },
+  sourceNode: { type: Object, default: null },
 })
 
 const emit = defineEmits(['close', 'created'])
@@ -25,7 +26,22 @@ const selectedModules = ref([...props.suggestedModules])
 const loading = ref(false)
 const error = ref(null)
 
-const modulesByCategory = computed(() => modulesStore.modulesByCategory)
+const compatibleModules = computed(() => modulesStore.modules.filter(module => (
+  (module.accepts || []).map(kind => kind.toLowerCase()).includes(formData.value.seed_kind)
+)))
+const modulesByCategory = computed(() => {
+  const grouped = {}
+  for (const module of compatibleModules.value) {
+    if (!grouped[module.category]) grouped[module.category] = []
+    grouped[module.category].push(module)
+  }
+  return grouped
+})
+
+watch(() => formData.value.seed_kind, () => {
+  const compatibleIds = new Set(compatibleModules.value.map(module => module.module_id))
+  selectedModules.value = selectedModules.value.filter(moduleId => compatibleIds.has(moduleId))
+})
 
 async function handleSubmit() {
   if (selectedModules.value.length === 0) {
@@ -41,6 +57,13 @@ async function handleSubmit() {
     }
     if (props.defaultCaseId) payload.case_id = props.defaultCaseId
     if (props.parentScanId) payload.parent_scan_id = props.parentScanId
+    if (props.sourceNode) {
+      payload.launch_source = 'case_node'
+      payload.source_node_type = props.sourceNode.node_type
+      payload.source_node_id = props.sourceNode.node_id
+      payload.source_node_label = props.sourceNode.label
+      payload.source_context = props.sourceNode.context || {}
+    }
 
     const scan = await scansStore.createScan(payload)
     emit('created', scan.id)
@@ -83,13 +106,25 @@ onMounted(() => {
               <option value="ip">IP Address</option>
               <option value="email">Email</option>
               <option value="url">URL</option>
+              <option value="phone">Phone</option>
               <option value="username">Username</option>
+              <option value="bitcoin">Bitcoin</option>
             </select>
           </div>
 
           <!-- Parent scan info -->
           <div v-if="parentScanId" class="rounded-lg px-3 py-2 text-sm" style="background-color: var(--bg-tertiary); color: var(--text-secondary)">
-            🔗 This will be a child scan derived from the parent graph node.
+            This will be a child scan derived from the parent graph node.
+          </div>
+
+          <div v-if="sourceNode" class="rounded-lg border px-3 py-2 text-sm space-y-1" style="border-color: var(--border); background-color: var(--bg-tertiary); color: var(--text-secondary)">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="badge badge-purple text-[10px]">case node</span>
+              <span class="font-medium break-all" style="color: var(--text-primary)">{{ sourceNode.label }}</span>
+            </div>
+            <p class="text-xs" style="color: var(--text-muted)">
+              Source metadata will be saved with this scan.
+            </p>
           </div>
 
           <!-- Modules -->
@@ -99,6 +134,9 @@ onMounted(() => {
             </label>
             <div v-if="modulesStore.loading" class="text-center py-4" style="color: var(--text-muted)">
               Loading modules…
+            </div>
+            <div v-else-if="compatibleModules.length === 0" class="rounded-lg border p-3 text-sm" style="border-color: var(--border); color: var(--text-muted); background-color: var(--bg-primary)">
+              No scan modules currently support this target type.
             </div>
             <div v-else class="space-y-4">
               <div v-for="(mods, category) in modulesByCategory" :key="category">

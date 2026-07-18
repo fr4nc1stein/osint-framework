@@ -27,6 +27,8 @@ const selectedNode   = ref(null)
 const scanFromNode   = ref(null)
 const showNodeScan   = ref(false)
 const nodeSuggestedModules = ref([])
+const nodeScanKind = ref('domain')
+const nodeScanSource = ref(null)
 const showEntityModal = ref(false)
 const showRelationshipModal = ref(false)
 const showEvidenceModal = ref(false)
@@ -66,6 +68,8 @@ watch(
       selectedNode.value = null
       scanFromNode.value = null
       showNodeScan.value = false
+      nodeScanKind.value = 'domain'
+      nodeScanSource.value = null
       selectedLeadKeys.value = []
       await loadCase(nextCaseId)
     }
@@ -352,6 +356,40 @@ function graphNodeLabel(node) {
   if (!node) return ''
   if (node.__evidence_label) return node.__evidence_label
   return `${node.kind || graphNodeType(node)} · ${node.label || node.value}`
+}
+
+function scanKindForNode(node) {
+  const kind = (node?.kind || '').toLowerCase()
+  const value = (node?.value || '').trim()
+  if (['domain', 'subdomain', 'hostname', 'host'].includes(kind)) return 'domain'
+  if (kind === 'ip') return 'ip'
+  if (kind === 'email') return 'email'
+  if (['url', 'profile_url'].includes(kind)) return 'url'
+  if (['username', 'alias'].includes(kind)) return 'username'
+  if (kind === 'social_profile') return /^https?:\/\//i.test(value) ? 'url' : 'username'
+  if (kind === 'phone') return 'phone'
+  if (kind === 'bitcoin') return 'bitcoin'
+  if (['company', 'organization'].includes(kind) && /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(value)) return 'domain'
+  return null
+}
+
+function scanSourceForNode(node) {
+  if (!node) return null
+  return {
+    node_type: graphNodeType(node),
+    node_id: node.id,
+    label: node.label || node.value,
+    context: {
+      node_kind: node.kind,
+      node_value: node.value,
+      graph_node_type: graphNodeType(node),
+      source_type: node.source_type,
+      verification_status: node.verification_status,
+      scan_origins: node.scan_origins || [],
+      promoted_entity_id: node.promoted_entity_id || null,
+      merged_entity_id: node.merged_entity_id || null,
+    },
+  }
 }
 
 function evidenceTargetType(target) {
@@ -802,10 +840,17 @@ function resolveNodeParentScanId(node) {
 }
 
 async function openScanFromNode(node) {
+  const scanKind = scanKindForNode(node)
+  if (!scanKind) {
+    window.alert('This node type does not have a supported scan workflow yet.')
+    return
+  }
   scanFromNode.value = node
   nodeSuggestedModules.value = []
+  nodeScanKind.value = scanKind
+  nodeScanSource.value = scanSourceForNode(node)
   try {
-    const { data } = await api.suggestModules(node.kind)
+    const { data } = await api.suggestModules(nodeScanKind.value)
     nodeSuggestedModules.value = data.map(module => module.module_id)
   } catch {
     nodeSuggestedModules.value = []
@@ -1181,8 +1226,12 @@ function evidenceTimelineTarget(item) {
                   <div class="flex items-center gap-2">
                     <span class="font-medium text-sm" style="color: var(--text-primary)">{{ s.seed_value }}</span>
                     <span class="badge badge-blue text-[10px]">{{ s.seed_kind }}</span>
+                    <span v-if="s.launch_source === 'case_node'" class="badge badge-purple text-[10px]">from node</span>
                   </div>
-                  <p class="text-xs mt-0.5" style="color: var(--text-muted)">{{ s.modules.join(', ') }}</p>
+                  <p class="text-xs mt-0.5" style="color: var(--text-muted)">
+                    {{ s.modules.join(', ') }}
+                    <span v-if="s.source_node_label"> · {{ s.source_node_label }}</span>
+                  </p>
                 </div>
                 <button class="btn-ghost text-xs shrink-0" @click.stop="openTimelineModal(scanTimelineTarget(s))">Timeline</button>
                 <span class="text-xs shrink-0" style="color: var(--text-muted)">{{ fmtDate(s.created_at) }}</span>
@@ -1195,8 +1244,12 @@ function evidenceTimelineTarget(item) {
                   <div class="flex items-center gap-2">
                     <span class="font-medium text-sm" style="color: var(--text-primary)">{{ child.seed_value }}</span>
                     <span class="badge badge-purple text-[10px]">child · {{ child.seed_kind }}</span>
+                    <span v-if="child.launch_source === 'case_node'" class="badge badge-purple text-[10px]">from node</span>
                   </div>
-                  <p class="text-xs mt-0.5" style="color: var(--text-muted)">{{ child.modules.join(', ') }}</p>
+                  <p class="text-xs mt-0.5" style="color: var(--text-muted)">
+                    {{ child.modules.join(', ') }}
+                    <span v-if="child.source_node_label"> · {{ child.source_node_label }}</span>
+                  </p>
                 </div>
                 <button class="btn-ghost text-xs shrink-0" @click.stop="openTimelineModal(scanTimelineTarget(child))">Timeline</button>
                 <span class="text-xs shrink-0" style="color: var(--text-muted)">{{ fmtDate(child.created_at) }}</span>
@@ -1517,11 +1570,12 @@ function evidenceTimelineTarget(item) {
     v-if="showNodeScan && scanFromNode"
     :default-case-id="caseId"
     :default-target="scanFromNode.value"
-    :default-kind="scanFromNode.kind"
+    :default-kind="nodeScanKind"
     :parent-scan-id="nodeParentScanId"
     :suggested-modules="nodeSuggestedModules"
-    @close="showNodeScan = false; scanFromNode = null; nodeSuggestedModules = []"
-    @created="() => { showNodeScan = false; scanFromNode = null; nodeSuggestedModules = []; casesStore.fetchCaseGraph(caseId) }"
+    :source-node="nodeScanSource"
+    @close="showNodeScan = false; scanFromNode = null; nodeSuggestedModules = []; nodeScanKind = 'domain'; nodeScanSource = null"
+    @created="() => { showNodeScan = false; scanFromNode = null; nodeSuggestedModules = []; nodeScanKind = 'domain'; nodeScanSource = null; casesStore.fetchCaseScans(caseId); casesStore.fetchCaseGraph(caseId) }"
   />
 
   <!-- Manual entity modal -->

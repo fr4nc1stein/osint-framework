@@ -225,6 +225,8 @@ onUnmounted(() => {
             ['Type',        scan.seed_kind],
             ['Case',        scan.case_id || 'None'],
             ['Parent Scan', scan.parent_scan_id || 'None'],
+            ['Launch Source', scan.launch_source || 'manual'],
+            ['Source Node', scan.source_node_label || scan.source_node_id || 'None'],
             ['Created',     new Date(scan.created_at).toLocaleString()],
             ['Started',     scan.started_at ? new Date(scan.started_at).toLocaleString() : '—'],
             ['Finished',    scan.finished_at ? new Date(scan.finished_at).toLocaleString() : '—'],

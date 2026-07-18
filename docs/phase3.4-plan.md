@@ -1,7 +1,7 @@
 # OSIF v2.0 - Phase 3.4 Plan: Skip Tracing, Private Investigation Workspace, Manual Graph, Timeline, Evidence, and Maps
 
 **Date:** 2026-07-14  
-**Status:** In Progress — Phase 3.4A, 3.4B, 3.4C, 3.4D, 3.4E, and 3.4F complete; next slice is Phase 3.4G scan-from-node hardening
+**Status:** In Progress — Phase 3.4A, 3.4B, 3.4C, 3.4D, 3.4E, 3.4F, and 3.4G complete; next slice is Phase 3.4H dossier and PI reports
 **Focus:** Extend cases from automated OSINT scan containers into full investigation workspaces for skip tracing and private investigation workflows.
 
 ---
@@ -1212,10 +1212,10 @@ Before production use, legal and policy requirements should be reviewed for the 
 
 ### Step 7: Scan From Node
 
-- [ ] Add node action menu.
-- [ ] Map entity types to available scan workflows.
-- [ ] Create scan runs from selected node values.
-- [ ] Write scan results back as leads with source metadata.
+- [x] Add node action menu.
+- [x] Map entity types to available scan workflows.
+- [x] Create scan runs from selected node values.
+- [x] Write scan results back as leads with source metadata.
 
 ### Step 8: Dossier And PI Reports
 
@@ -1530,3 +1530,53 @@ Validation completed:
 - API smoke test inserted a temporary scan finding, verified scan indicators/edges appeared as open leads, rejected a scan indicator, verified the default graph hid the rejected scan-derived path, then deleted the temporary case.
 - API smoke test promoted a temporary scan indicator, verified the promoted case entity remained connected to the scan-derived edge, verified the original indicator was hidden from the default graph, then deleted the temporary case.
 - API smoke test rejected a temporary scan-derived location indicator, verified the default map marker disappeared, verified `include_rejected=true` still returned the marker, then deleted the temporary case.
+
+### Plan G — Scan From Node Hardening
+
+Implemented the scan-from-node hardening slice:
+
+- Added first-class scan launch provenance fields:
+  - `launch_source`
+  - `source_node_type`
+  - `source_node_id`
+  - `source_node_label`
+  - `source_context`
+- Added migration `5b2c9a8f1d7e_add_scan_node_provenance.py`.
+- Added index `idx_scans_source_node` for case-scoped source-node lookup.
+- Backend scan creation now validates:
+  - provided `case_id` exists
+  - `parent_scan_id` exists and belongs to the same case when applicable
+  - `source_node_type` and `source_node_id` are provided together
+  - source entity, indicator, or graph edge belongs to the case
+  - requested modules exist
+  - requested modules support the normalized scan target kind
+  - duplicate modules are rejected
+- Module suggestions now normalize common graph node aliases:
+  - `subdomain`, `hostname`, and `host` -> `domain`
+  - `profile_url` -> `url`
+  - `social_profile` and `alias` -> `username`
+- Case graph and case scan list responses now include scan launch provenance fields.
+- Child scan responses now include scan launch provenance fields.
+- Scan detail view now shows launch source and source node.
+- Case scan list shows a `from node` badge and source node label for node-launched scans.
+- Scan-from-node modal now receives source-node metadata and sends it to the backend.
+- Scan-from-node now normalizes node kinds into supported scan target kinds before suggesting modules:
+  - domain-like nodes -> `domain`
+  - IP nodes -> `ip`
+  - email nodes -> `email`
+  - URL/profile URL nodes -> `url`
+  - username/alias/social-profile nodes -> `username`
+  - phone nodes -> `phone`
+  - bitcoin nodes -> `bitcoin`
+- Unsupported graph node types now stop before opening the scan modal instead of creating an invalid scan request.
+- The scan modal now filters module checkboxes to modules compatible with the selected target type.
+- The scan modal now displays the source node summary before launch.
+
+Validation completed:
+
+- `python3 -m py_compile` passed for new/changed backend scan, module, graph, and child-scan modules.
+- `npm --prefix frontend run build` passed.
+- `docker compose -f docker-compose.dev.yml exec -T backend alembic upgrade head` applied migration `5b2c9a8f1d7e`.
+- API smoke test created a temporary manual domain node, validated source-node scan creation rules, persisted a scan with node provenance, verified the case scan list returned the provenance, validated the scan response schema, then deleted the temporary case.
+- API check verified `/api/v1/modules/suggest?node_type=hostname` returns domain-compatible modules with `effective_seed_kind=domain`.
+- Backend health check returned `ok`.

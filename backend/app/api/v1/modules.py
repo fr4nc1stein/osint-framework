@@ -20,7 +20,15 @@ async def list_modules(category: str | None = None):
 @router.get("/suggest")
 async def suggest_modules(node_type: str = "domain", configured_only: bool = False):
     """Return applicable modules for a given node type (must be before /{module_id})"""
-    normalized_type = node_type.lower()
+    raw_type = node_type.lower()
+    normalized_type = {
+        "subdomain": "domain",
+        "hostname": "domain",
+        "host": "domain",
+        "profile_url": "url",
+        "social_profile": "username",
+        "alias": "username",
+    }.get(raw_type, raw_type)
     modules = [
         module
         for module in get_all_modules()
@@ -38,6 +46,8 @@ async def suggest_modules(node_type: str = "domain", configured_only: bool = Fal
             "description": module.description,
             "category": module.category,
             "accepts": module.accepts,
+            "requested_node_type": raw_type,
+            "effective_seed_kind": normalized_type,
             "requires_api_key": module.requires_api_key,
             "api_key_configured": module.api_key_configured,
         }
