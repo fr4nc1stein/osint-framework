@@ -1,0 +1,31 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# System deps
+RUN apt-get update && apt-get install -y \
+    gcc \
+    netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install console deps (sploitkit + v1 module deps)
+COPY requirements-console.txt .
+RUN pip install --no-cache-dir -r requirements-console.txt
+
+# sploitkit pulls setuptools>=70 which removes pkg_resources as a top-level module.
+# Force-reinstall an older version AFTER all other deps so pkg_resources is importable.
+RUN pip install --no-cache-dir --force-reinstall "setuptools==68.2.2"
+
+# Copy the root-level console files
+COPY osif         ./osif
+COPY commands/    ./commands/
+COPY modules/     ./modules/
+COPY banners/     ./banners/
+
+# Copy .env if present (API keys)
+COPY .env* ./
+
+RUN chmod +x ./osif
+
+# Keep container alive so docker exec works
+CMD ["tail", "-f", "/dev/null"]

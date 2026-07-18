@@ -1,0 +1,156 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: osif_postgres
+    environment:
+      POSTGRES_DB: osif
+      POSTGRES_USER: osif
+      POSTGRES_PASSWORD: osif
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U osif"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: osif_redis
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: osif_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: osif_minio
+      MINIO_ROOT_PASSWORD: osif_minio_password
+    ports:
+      - "9100:9000"
+      - "9101:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: osif_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set osif http://minio:9000 osif_minio osif_minio_password;
+      mc mb --ignore-existing osif/osif-evidence;
+      mc anonymous set none osif/osif-evidence;
+      "
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: osif_backend
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 6000
+    ports:
+      - "6000:6000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://osif:osif@postgres:5432/osif
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      API_PORT: 6000
+      DEBUG: "true"
+      CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000"]'
+      EVIDENCE_STORAGE_BACKEND: s3
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_BUCKET: osif-evidence
+      S3_ACCESS_KEY: osif_minio
+      S3_SECRET_KEY: osif_minio_password
+      S3_REGION: us-east-1
+      S3_FORCE_PATH_STYLE: "true"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: osif_worker
+    command: arq app.tasks.worker.WorkerSettings
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://osif:osif@postgres:5432/osif
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      WORKER_CONCURRENCY: 4
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_MAPBOX_TOKEN: ${VITE_MAPBOX_TOKEN:-}
+    container_name: osif_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+  # MSF-style REPL console — docker exec -it osif_console ./osif
+  console:
+    build:
+      context: .
+      dockerfile: Dockerfile.console
+    container_name: osif_console
+    stdin_open: true
+    tty: true
+    env_file:
+      - .env
+    environment:
+      OSIF_API_URL: http://backend:6000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
