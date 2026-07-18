@@ -1,7 +1,7 @@
 # OSIF v2.0 - Phase 3.4 Plan: Skip Tracing, Private Investigation Workspace, Manual Graph, Timeline, Evidence, and Maps
 
 **Date:** 2026-07-14  
-**Status:** In Progress — Phase 3.4A, 3.4B, 3.4C, 3.4D, and 3.4E complete; next slice is Phase 3.4F leads/review
+**Status:** In Progress — Phase 3.4A, 3.4B, 3.4C, 3.4D, 3.4E, and 3.4F complete; next slice is Phase 3.4G scan-from-node hardening
 **Focus:** Extend cases from automated OSINT scan containers into full investigation workspaces for skip tracing and private investigation workflows.
 
 ---
@@ -1203,12 +1203,12 @@ Before production use, legal and policy requirements should be reviewed for the 
 - [x] Add backend geocoding provider abstraction later, routed through integration settings.
 - [x] Normalize geolocation observations into `case_geolocations` for enterprise workflows.
 
-### Step 6: Leads And Review
+### Step 6: Leads And Review — Done
 
-- [ ] Add lead status to manual and scan-derived objects.
-- [ ] Add review queue.
-- [ ] Add promote/reject/merge actions.
-- [ ] Keep automated scan results as leads until confirmed.
+- [x] Add lead status to manual and scan-derived objects.
+- [x] Add review queue.
+- [x] Add promote/reject/merge actions.
+- [x] Keep automated scan results as leads until confirmed.
 
 ### Step 7: Scan From Node
 
@@ -1416,13 +1416,13 @@ Validation completed:
 
 ### Next Slice
 
-Recommended Plan F:
+Recommended Plan G:
 
-- Leads and review workflow:
-  - lead board
-  - promote/reject/merge actions
-  - scan result review queue
-  - separation of confirmed facts from unverified leads across graph, map, reports, and dossier
+- Scan from node hardening:
+  - node action menu
+  - entity-type to scan-template mapping
+  - scan creation from selected manual or promoted nodes
+  - scan outputs written back as reviewable leads
 
 ### Plan E — Geolocation Editing And Unmapped Assignment
 
@@ -1467,3 +1467,54 @@ Validation completed:
 - `docker compose -f docker-compose.dev.yml exec -T backend alembic upgrade head` applied migration `d91c8b2f6a10`.
 - API smoke test created a temporary case, added a mapped manual office, verified one normalized geolocation, verified one map marker with `geolocation_id`, then deleted the temporary case.
 - API smoke test verified geocoding refuses external lookup without explicit consent.
+
+### Plan F — Leads And Review Workflow
+
+Implemented the lead review foundation:
+
+- Added `case_lead_reviews` table for persistent analyst decisions on scan-derived and curated objects.
+- Added migration `e24a5fd8b0ce_add_case_lead_reviews.py`.
+- Added backend lead queue endpoint:
+  - `GET /api/v1/cases/{case_id}/leads`
+- Added backend review action endpoint:
+  - `PATCH /api/v1/cases/{case_id}/leads/{target_type}/{target_id}`
+- Lead queue aggregates:
+  - manual entities
+  - manual relationships
+  - timeline events
+  - geolocation observations
+  - scan-derived indicators
+  - scan-derived graph edges
+- Added `follow_up` as a supported verification/review status.
+- Scan-derived indicators and graph edges now default to `needs_review` instead of `confirmed`.
+- Rejected scan-derived indicators and edges are hidden from the default case graph.
+- Rejected manual entities and relationships are hidden from the default case graph.
+- Review actions support:
+  - confirm
+  - reject
+  - follow up
+  - stale
+  - promote scan indicator to case entity
+  - merge scan indicator into an existing manual entity
+- Added case Leads tab with:
+  - open/all/status filters
+  - object-type filters
+  - per-lead selection checkboxes
+  - select-all-visible control
+  - sticky bulk action bar
+  - queue counts
+  - lead cards with source, status, confidence, scan origin, promotion, and merge badges
+  - quick review actions
+  - bulk confirm, follow-up, stale, and reject actions for selected leads
+  - evidence and timeline shortcuts
+  - graph jump for entity and indicator leads
+- Bulk reject asks for confirmation because rejected leads are hidden from the default graph.
+- Bulk promote and bulk merge are intentionally not included in this slice; those remain single-lead actions to avoid accidental entity creation or incorrect merges.
+
+Validation completed:
+
+- `python3 -m py_compile` passed for new/changed backend lead modules.
+- `npm --prefix frontend run build` passed.
+- `docker compose -f docker-compose.dev.yml exec -T backend alembic upgrade head` applied migration `e24a5fd8b0ce`.
+- API smoke test created a temporary manual lead, listed it in the queue, confirmed it, verified it left the open queue, verified it appeared in confirmed leads, then deleted the temporary case.
+- API smoke test inserted a temporary scan finding, verified scan indicators/edges appeared as open leads, rejected a scan indicator, verified the default graph hid the rejected scan-derived path, then deleted the temporary case.

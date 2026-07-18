@@ -22,6 +22,9 @@ export const useCasesStore = defineStore('cases', {
     caseEvidenceCaseId: null,
     caseTimelineEvents: [],
     caseTimelineEventsCaseId: null,
+    caseLeads: null,
+    caseLeadsCaseId: null,
+    caseLeadsParams: null,
     caseNotes: [],
     caseNotesCaseId: null,
     caseReports: [],
@@ -66,6 +69,9 @@ export const useCasesStore = defineStore('cases', {
           this.caseEvidenceCaseId = null
           this.caseTimelineEvents = []
           this.caseTimelineEventsCaseId = null
+          this.caseLeads = null
+          this.caseLeadsCaseId = null
+          this.caseLeadsParams = null
           this.caseNotes = []
           this.caseNotesCaseId = null
           this.caseReports = []
@@ -275,6 +281,22 @@ export const useCasesStore = defineStore('cases', {
       await api.deleteCaseTimelineEvent(caseId, eventId)
       this.caseTimelineEvents = this.caseTimelineEvents.filter(e => e.id !== eventId)
       this.caseMapCaseId = null
+    },
+
+    async fetchCaseLeads(caseId, params = undefined) {
+      const { data } = await api.getCaseLeads(caseId, params)
+      this.caseLeads = data
+      this.caseLeadsCaseId = caseId
+      this.caseLeadsParams = params || {}
+      return data
+    },
+
+    async reviewCaseLead(caseId, targetType, targetId, payload) {
+      const { data } = await api.reviewCaseLead(caseId, targetType, targetId, payload)
+      this.caseLeadsCaseId = null
+      this.caseGraphCaseId = null
+      this.caseMapCaseId = null
+      return data
     },
 
     async fetchCaseNotes(caseId) {

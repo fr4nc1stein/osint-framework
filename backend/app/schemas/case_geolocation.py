@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 TARGET_TYPE_PATTERN = "^(entity|evidence|timeline_event|graph_edge|scan|indicator|case)$"
 PRECISION_PATTERN = "^(exact|building|street|city|region|country|ip_geo_approximate|unknown)$"
 SOURCE_TYPE_PATTERN = "^(manual|scan|integration|import|ai_suggested|evidence)$"
-STATUS_PATTERN = "^(lead|needs_review|confirmed|rejected|stale|collected)$"
+STATUS_PATTERN = "^(lead|needs_review|follow_up|confirmed|rejected|stale|collected)$"
 
 
 class CaseGeolocationBase(BaseModel):

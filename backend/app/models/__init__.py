@@ -12,6 +12,7 @@ from app.models.case_entity import CaseEntity
 from app.models.case_relationship import CaseRelationship
 from app.models.case_timeline import CaseTimelineEvent, CaseTimelineLink
 from app.models.case_geolocation import CaseGeolocation
+from app.models.case_lead_review import CaseLeadReview
 
 __all__ = [
     "Case",
@@ -29,4 +30,5 @@ __all__ = [
     "CaseTimelineEvent",
     "CaseTimelineLink",
     "CaseGeolocation",
+    "CaseLeadReview",
 ]

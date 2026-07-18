@@ -16,7 +16,7 @@ const casesStore = useCasesStore()
 
 const caseId    = computed(() => route.params.id)
 const activeTab = ref('scans')
-const tabs      = ['scans', 'graph', 'map', 'timeline', 'evidence', 'notes', 'reports']
+const tabs      = ['scans', 'graph', 'leads', 'map', 'timeline', 'evidence', 'notes', 'reports']
 
 const showScanModal  = ref(false)
 const showEditModal  = ref(false)
@@ -47,6 +47,12 @@ const timelineError = ref('')
 const locationError = ref('')
 const selectedNodeEvidence = ref([])
 const selectedNodeEvidenceLoading = ref(false)
+const leadStatusFilter = ref('open')
+const leadTypeFilter = ref('all')
+const leadMergeTargets = ref({})
+const leadActionError = ref('')
+const selectedLeadKeys = ref([])
+const bulkLeadActionLoading = ref(false)
 
 onMounted(async () => {
   await loadCase(caseId.value)
@@ -60,6 +66,7 @@ watch(
       selectedNode.value = null
       scanFromNode.value = null
       showNodeScan.value = false
+      selectedLeadKeys.value = []
       await loadCase(nextCaseId)
     }
   }
@@ -69,6 +76,7 @@ async function loadCase(id) {
   await casesStore.fetchCase(id)
   await casesStore.fetchCaseScans(id)
   await casesStore.fetchCaseGraph(id)
+  await casesStore.fetchCaseLeads(id, { status: leadStatusFilter.value, lead_type: leadTypeFilter.value })
   await casesStore.fetchCaseEvidence(id)
   await casesStore.fetchCaseTimeline(id)
   await casesStore.fetchCaseNotes(id)
@@ -87,8 +95,24 @@ const evidence    = computed(() => casesStore.caseEvidence)
 const timelineEvents = computed(() => casesStore.caseTimelineEvents)
 const caseGraph   = computed(() => casesStore.caseGraph)
 const caseMap     = computed(() => casesStore.caseMap)
+const caseLeads   = computed(() => casesStore.caseLeads)
 const nodeParentScanId = computed(() => resolveNodeParentScanId(scanFromNode.value))
 const graphNodes = computed(() => caseGraph.value?.nodes ?? [])
+const manualEntityOptions = computed(() => graphNodes.value.filter(node => node.graph_node_type === 'entity'))
+const visibleLeads = computed(() => caseLeads.value?.items ?? [])
+const selectedLeads = computed(() => visibleLeads.value.filter(lead => selectedLeadKeys.value.includes(leadKey(lead))))
+const allVisibleLeadsSelected = computed(() => (
+  visibleLeads.value.length > 0 && visibleLeads.value.every(lead => selectedLeadKeys.value.includes(leadKey(lead)))
+))
+const selectedLeadSummary = computed(() => {
+  const counts = selectedLeads.value.reduce((acc, lead) => {
+    acc[lead.target_type] = (acc[lead.target_type] || 0) + 1
+    return acc
+  }, {})
+  return Object.entries(counts)
+    .map(([type, count]) => `${count} ${type.replace(/_/g, ' ')}`)
+    .join(', ')
+})
 const locationEntityOptions = computed(() => graphNodes.value.filter(node => (
   node.graph_node_type === 'entity' && ['address', 'location', 'office', 'company', 'organization', 'person', 'vehicle'].includes(node.kind)
 )))
@@ -198,6 +222,9 @@ async function switchTab(tab) {
   }
   if (tab === 'timeline' && casesStore.caseTimelineEventsCaseId !== currentCaseId()) {
     await casesStore.fetchCaseTimeline(currentCaseId())
+  }
+  if (tab === 'leads' && casesStore.caseLeadsCaseId !== currentCaseId()) {
+    await refreshLeads()
   }
 }
 
@@ -608,6 +635,135 @@ async function quickPriority(priority) {
   await casesStore.updateCase(currentCaseId(), { priority })
 }
 
+async function refreshLeads() {
+  await casesStore.fetchCaseLeads(currentCaseId(), {
+    status: leadStatusFilter.value,
+    lead_type: leadTypeFilter.value,
+  })
+  const visibleKeys = new Set(visibleLeads.value.map(lead => leadKey(lead)))
+  selectedLeadKeys.value = selectedLeadKeys.value.filter(key => visibleKeys.has(key))
+}
+
+async function onLeadFiltersChanged() {
+  selectedLeadKeys.value = []
+  await refreshLeads()
+}
+
+function leadKey(lead) {
+  return `${lead.target_type}:${lead.target_id}`
+}
+
+function isLeadSelected(lead) {
+  return selectedLeadKeys.value.includes(leadKey(lead))
+}
+
+function toggleLeadSelection(lead) {
+  const key = leadKey(lead)
+  selectedLeadKeys.value = selectedLeadKeys.value.includes(key)
+    ? selectedLeadKeys.value.filter(item => item !== key)
+    : [...selectedLeadKeys.value, key]
+}
+
+function selectAllVisibleLeads() {
+  selectedLeadKeys.value = allVisibleLeadsSelected.value
+    ? []
+    : visibleLeads.value.map(lead => leadKey(lead))
+}
+
+function clearSelectedLeads() {
+  selectedLeadKeys.value = []
+}
+
+function leadBadgeClass(status) {
+  return {
+    lead: 'badge-blue',
+    needs_review: 'badge-amber',
+    follow_up: 'badge-purple',
+    confirmed: 'badge-green',
+    rejected: 'badge-red',
+    stale: 'badge-slate',
+  }[status] || 'badge-slate'
+}
+
+function leadTarget(lead) {
+  return {
+    id: lead.target_id,
+    kind: lead.lead_type,
+    label: lead.label,
+    value: lead.value || lead.label,
+    graph_node_type: lead.target_type === 'indicator' ? 'indicator' : 'entity',
+    __evidence_target_type: lead.target_type,
+    __evidence_target_id: lead.target_id,
+    __evidence_label: `${lead.target_type} · ${lead.label}`,
+    __timeline_target_type: lead.target_type,
+    __timeline_target_id: lead.target_id,
+    __timeline_label: `${lead.target_type} · ${lead.label}`,
+  }
+}
+
+async function reviewLead(lead, action, extra = {}) {
+  leadActionError.value = ''
+  try {
+    await casesStore.reviewCaseLead(currentCaseId(), lead.target_type, lead.target_id, {
+      action,
+      notes: extra.notes || null,
+      merged_entity_id: extra.merged_entity_id || null,
+    })
+    selectedLeadKeys.value = selectedLeadKeys.value.filter(key => key !== leadKey(lead))
+    await casesStore.fetchCaseGraph(currentCaseId())
+    if (activeTab.value === 'map') await casesStore.fetchCaseMap(currentCaseId())
+    await refreshLeads()
+  } catch (e) {
+    leadActionError.value = e.response?.data?.detail || e.message
+  }
+}
+
+async function bulkReviewLeads(action) {
+  if (!selectedLeads.value.length || bulkLeadActionLoading.value) return
+  if (action === 'reject') {
+    const ok = window.confirm(`Reject ${selectedLeads.value.length} selected lead${selectedLeads.value.length === 1 ? '' : 's'}? Rejected leads are hidden from the default graph.`)
+    if (!ok) return
+  }
+
+  leadActionError.value = ''
+  bulkLeadActionLoading.value = true
+  try {
+    const targets = [...selectedLeads.value]
+    for (const lead of targets) {
+      await casesStore.reviewCaseLead(currentCaseId(), lead.target_type, lead.target_id, { action })
+    }
+    selectedLeadKeys.value = []
+    await casesStore.fetchCaseGraph(currentCaseId())
+    if (activeTab.value === 'map') await casesStore.fetchCaseMap(currentCaseId())
+    await refreshLeads()
+  } catch (e) {
+    leadActionError.value = e.response?.data?.detail || e.message
+  } finally {
+    bulkLeadActionLoading.value = false
+  }
+}
+
+async function mergeLead(lead) {
+  const mergedEntityId = leadMergeTargets.value[leadKey(lead)]
+  if (!mergedEntityId) {
+    leadActionError.value = 'Select a manual entity to merge into.'
+    return
+  }
+  await reviewLead(lead, 'merge', { merged_entity_id: mergedEntityId })
+}
+
+async function openLeadInGraph(lead) {
+  if (!['entity', 'indicator'].includes(lead.target_type)) return
+  if (casesStore.caseGraphCaseId !== currentCaseId()) {
+    await casesStore.fetchCaseGraph(currentCaseId())
+  }
+  const node = graphNodes.value.find(item => item.id === lead.target_id)
+  if (node) {
+    activeTab.value = 'graph'
+    onNodeSelect(node)
+  }
+}
+
 function unique(values) {
   return [...new Set(values.filter(Boolean))]
 }
@@ -909,6 +1065,7 @@ function evidenceTimelineTarget(item) {
             @click="switchTab(tab)">
             {{ tab }}
             <span v-if="tab === 'scans'  && scans.length"   class="ml-1.5 badge badge-blue">{{ scans.length }}</span>
+            <span v-if="tab === 'leads' && caseLeads?.counts?.open" class="ml-1.5 badge badge-amber">{{ caseLeads.counts.open }}</span>
             <span v-if="tab === 'map' && caseMap?.counts?.markers" class="ml-1.5 badge badge-green">{{ caseMap.counts.markers }}</span>
             <span v-if="tab === 'evidence' && evidence.length" class="ml-1.5 badge badge-slate">{{ evidence.length }}</span>
             <span v-if="tab === 'notes'  && notes.length"   class="ml-1.5 badge badge-slate">{{ notes.length }}</span>
@@ -1044,6 +1201,144 @@ function evidenceTimelineTarget(item) {
                 <span class="text-xs shrink-0" style="color: var(--text-muted)">{{ fmtDate(child.created_at) }}</span>
               </div>
             </template>
+          </div>
+        </div>
+
+        <!-- Leads tab -->
+        <div v-if="activeTab === 'leads'" class="space-y-4">
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 class="text-lg font-semibold" style="color: var(--text-primary)">Leads</h2>
+              <p class="text-sm" style="color: var(--text-muted)">Review manual observations and scan-derived findings before treating them as facts.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <select v-model="leadStatusFilter" class="input text-sm w-40" @change="onLeadFiltersChanged">
+                <option value="open">Open</option>
+                <option value="all">All</option>
+                <option value="lead">Lead</option>
+                <option value="needs_review">Needs Review</option>
+                <option value="follow_up">Follow Up</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="rejected">Rejected</option>
+                <option value="stale">Stale</option>
+              </select>
+              <select v-model="leadTypeFilter" class="input text-sm w-40" @change="onLeadFiltersChanged">
+                <option value="all">All Types</option>
+                <option value="entity">Manual Entities</option>
+                <option value="relationship">Relationships</option>
+                <option value="indicator">Scan Indicators</option>
+                <option value="graph_edge">Scan Edges</option>
+                <option value="geolocation">Geolocations</option>
+                <option value="timeline_event">Timeline Events</option>
+              </select>
+              <button class="btn-secondary text-sm" @click="refreshLeads">Refresh</button>
+            </div>
+          </div>
+
+          <div class="grid gap-3 md:grid-cols-4">
+            <div class="card p-3">
+              <p class="text-xs" style="color: var(--text-muted)">Open</p>
+              <p class="text-xl font-semibold" style="color: var(--text-primary)">{{ caseLeads?.counts?.open || 0 }}</p>
+            </div>
+            <div class="card p-3">
+              <p class="text-xs" style="color: var(--text-muted)">Needs Review</p>
+              <p class="text-xl font-semibold" style="color: var(--text-primary)">{{ caseLeads?.counts?.by_status?.needs_review || 0 }}</p>
+            </div>
+            <div class="card p-3">
+              <p class="text-xs" style="color: var(--text-muted)">Follow Up</p>
+              <p class="text-xl font-semibold" style="color: var(--text-primary)">{{ caseLeads?.counts?.by_status?.follow_up || 0 }}</p>
+            </div>
+            <div class="card p-3">
+              <p class="text-xs" style="color: var(--text-muted)">Confirmed</p>
+              <p class="text-xl font-semibold" style="color: var(--text-primary)">{{ caseLeads?.counts?.by_status?.confirmed || 0 }}</p>
+            </div>
+          </div>
+
+          <p v-if="leadActionError" class="text-sm text-red-400">{{ leadActionError }}</p>
+
+          <div
+            v-if="caseLeads?.items?.length"
+            class="sticky top-0 z-10 rounded-lg border p-3 flex flex-wrap items-center justify-between gap-3"
+            style="border-color: var(--border); background-color: var(--bg-secondary)"
+          >
+            <label class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--text-secondary)">
+              <input
+                type="checkbox"
+                :checked="allVisibleLeadsSelected"
+                @change="selectAllVisibleLeads"
+              />
+              Select all visible
+            </label>
+            <div v-if="selectedLeads.length" class="flex flex-wrap items-center gap-2">
+              <span class="badge badge-amber">{{ selectedLeads.length }} selected</span>
+              <span v-if="selectedLeadSummary" class="text-xs" style="color: var(--text-muted)">{{ selectedLeadSummary }}</span>
+              <button class="btn-secondary text-xs" :disabled="bulkLeadActionLoading" @click="bulkReviewLeads('confirm')">Confirm</button>
+              <button class="btn-secondary text-xs" :disabled="bulkLeadActionLoading" @click="bulkReviewLeads('follow_up')">Follow Up</button>
+              <button class="btn-secondary text-xs" :disabled="bulkLeadActionLoading" @click="bulkReviewLeads('stale')">Stale</button>
+              <button class="btn-secondary text-xs text-red-300" :disabled="bulkLeadActionLoading" @click="bulkReviewLeads('reject')">Reject</button>
+              <button class="btn-ghost text-xs" :disabled="bulkLeadActionLoading" @click="clearSelectedLeads">Clear</button>
+            </div>
+          </div>
+
+          <div v-if="!caseLeads || casesStore.loading" class="flex items-center justify-center h-24">
+            <div class="h-7 w-7 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+          </div>
+          <div v-else-if="caseLeads.items.length === 0" class="text-center py-12" style="color: var(--text-muted)">
+            No leads match the current filters.
+          </div>
+          <div v-else class="space-y-3">
+            <div v-for="lead in caseLeads.items" :key="lead.id" class="card p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0 flex-1 flex gap-3">
+                  <input
+                    type="checkbox"
+                    class="mt-1 shrink-0"
+                    :checked="isLeadSelected(lead)"
+                    @change="toggleLeadSelection(lead)"
+                  />
+                  <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="font-medium break-words" style="color: var(--text-primary)">{{ lead.label }}</h3>
+                    <span class="badge badge-blue">{{ lead.lead_type }}</span>
+                    <span class="badge badge-slate">{{ lead.target_type }}</span>
+                    <span class="badge" :class="leadBadgeClass(lead.review_status)">{{ lead.review_status.replace(/_/g, ' ') }}</span>
+                  </div>
+                  <p v-if="lead.value && lead.value !== lead.label" class="text-sm mt-1 break-all" style="color: var(--text-secondary)">{{ lead.value }}</p>
+                  <p v-if="lead.description" class="text-sm mt-1" style="color: var(--text-secondary)">{{ lead.description }}</p>
+                  <div class="flex flex-wrap gap-1.5 mt-2">
+                    <span class="badge badge-slate">{{ lead.source_type }}</span>
+                    <span v-if="lead.source_module" class="badge badge-slate">{{ lead.source_module }}</span>
+                    <span v-if="lead.confidence != null" class="badge badge-slate">{{ Math.round(lead.confidence * 100) }}%</span>
+                    <span v-if="lead.scan_origins?.length" class="badge badge-amber">{{ lead.scan_origins.length }} scan{{ lead.scan_origins.length === 1 ? '' : 's' }}</span>
+                    <span v-if="lead.promoted_entity_id" class="badge badge-green">promoted</span>
+                    <span v-if="lead.merged_entity_id" class="badge badge-green">merged</span>
+                  </div>
+                  <p v-if="lead.notes" class="text-xs mt-2" style="color: var(--text-muted)">{{ lead.notes }}</p>
+                  </div>
+                </div>
+                <p class="text-xs shrink-0" style="color: var(--text-muted)">{{ lead.created_at ? fmtDate(lead.created_at) : '' }}</p>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2 mt-4">
+                <button class="btn-secondary text-xs" @click="reviewLead(lead, 'confirm')">Confirm</button>
+                <button class="btn-secondary text-xs" @click="reviewLead(lead, 'follow_up')">Follow Up</button>
+                <button class="btn-secondary text-xs text-red-300" @click="reviewLead(lead, 'reject')">Reject</button>
+                <button v-if="lead.target_type === 'indicator'" class="btn-secondary text-xs" @click="reviewLead(lead, 'promote')">Promote Node</button>
+                <button v-if="['entity','indicator'].includes(lead.target_type)" class="btn-secondary text-xs" @click="openLeadInGraph(lead)">Graph</button>
+                <button class="btn-secondary text-xs" @click="openEvidenceModal(leadTarget(lead))">Evidence</button>
+                <button class="btn-secondary text-xs" @click="openTimelineModal(leadTarget(lead))">Timeline</button>
+              </div>
+
+              <div v-if="lead.target_type === 'indicator' && manualEntityOptions.length" class="mt-3 flex flex-wrap items-center gap-2">
+                <select v-model="leadMergeTargets[leadKey(lead)]" class="input text-xs max-w-sm">
+                  <option value="">Merge into manual entity...</option>
+                  <option v-for="node in manualEntityOptions" :key="node.id" :value="node.id">
+                    {{ node.kind }} · {{ node.label || node.value }}
+                  </option>
+                </select>
+                <button class="btn-secondary text-xs" @click="mergeLead(lead)">Merge</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1266,6 +1561,7 @@ function evidenceTimelineTarget(item) {
               <select v-model="entityForm.verification_status" class="input">
                 <option value="lead">Lead</option>
                 <option value="needs_review">Needs Review</option>
+                <option value="follow_up">Follow Up</option>
                 <option value="confirmed">Confirmed</option>
                 <option value="rejected">Rejected</option>
                 <option value="stale">Stale</option>
@@ -1384,6 +1680,7 @@ function evidenceTimelineTarget(item) {
               <select v-model="locationForm.verification_status" class="input">
                 <option value="lead">Lead</option>
                 <option value="needs_review">Needs Review</option>
+                <option value="follow_up">Follow Up</option>
                 <option value="confirmed">Confirmed</option>
                 <option value="rejected">Rejected</option>
                 <option value="stale">Stale</option>
@@ -1452,6 +1749,7 @@ function evidenceTimelineTarget(item) {
               <select v-model="relationshipForm.verification_status" class="input">
                 <option value="lead">Lead</option>
                 <option value="needs_review">Needs Review</option>
+                <option value="follow_up">Follow Up</option>
                 <option value="confirmed">Confirmed</option>
                 <option value="rejected">Rejected</option>
                 <option value="stale">Stale</option>
@@ -1599,6 +1897,7 @@ function evidenceTimelineTarget(item) {
               <select v-model="timelineForm.verification_status" class="input">
                 <option value="lead">Lead</option>
                 <option value="needs_review">Needs Review</option>
+                <option value="follow_up">Follow Up</option>
                 <option value="confirmed">Confirmed</option>
                 <option value="rejected">Rejected</option>
                 <option value="stale">Stale</option>

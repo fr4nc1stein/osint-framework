@@ -21,7 +21,7 @@ class CaseRelationshipBase(BaseModel):
     source_type: str = Field(default="manual", pattern="^(manual|scan|integration|import|ai_suggested)$")
     source_ref: Optional[str] = None
     confidence: Optional[float] = Field(default=None, ge=0, le=1)
-    verification_status: str = Field(default="lead", pattern="^(lead|needs_review|confirmed|rejected|stale)$")
+    verification_status: str = Field(default="lead", pattern="^(lead|needs_review|follow_up|confirmed|rejected|stale)$")
     created_by: Optional[str] = None
 
 
@@ -36,7 +36,7 @@ class CaseRelationshipUpdate(BaseModel):
     properties: Optional[dict] = None
     source_ref: Optional[str] = None
     confidence: Optional[float] = Field(default=None, ge=0, le=1)
-    verification_status: Optional[str] = Field(default=None, pattern="^(lead|needs_review|confirmed|rejected|stale)$")
+    verification_status: Optional[str] = Field(default=None, pattern="^(lead|needs_review|follow_up|confirmed|rejected|stale)$")
 
 
 class CaseRelationshipResponse(CaseRelationshipBase):

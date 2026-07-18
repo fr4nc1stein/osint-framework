@@ -10,7 +10,7 @@ TARGET_TYPE_PATTERN = "^(entity|relationship|evidence|scan|indicator|graph_edge|
 SOURCE_TYPE_PATTERN = "^(manual|scan|integration|import|ai_suggested)$"
 EVENT_TYPE_PATTERN = "^(sighting|address_observed|phone_observed|email_observed|account_created|profile_updated|domain_registered|breach_observed|scan_run|report_generated|note_added|contact_attempt|employment_observed|travel_or_movement|legal_event|evidence_collected|custom)$"
 PRECISION_PATTERN = "^(exact|date|month|year|approximate|unknown)$"
-VERIFICATION_STATUS_PATTERN = "^(lead|needs_review|confirmed|rejected|stale)$"
+VERIFICATION_STATUS_PATTERN = "^(lead|needs_review|follow_up|confirmed|rejected|stale)$"
 
 
 class CaseTimelineLinkBase(BaseModel):

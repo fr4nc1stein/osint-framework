@@ -57,6 +57,8 @@ export const api = {
   createCaseTimelineEvent: (caseId, data) => apiClient.post(`/api/v1/cases/${caseId}/timeline`, data),
   updateCaseTimelineEvent: (caseId, eventId, data) => apiClient.put(`/api/v1/cases/${caseId}/timeline/${eventId}`, data),
   deleteCaseTimelineEvent: (caseId, eventId) => apiClient.delete(`/api/v1/cases/${caseId}/timeline/${eventId}`),
+  getCaseLeads: (caseId, params) => apiClient.get(`/api/v1/cases/${caseId}/leads`, { params }),
+  reviewCaseLead: (caseId, targetType, targetId, data) => apiClient.patch(`/api/v1/cases/${caseId}/leads/${targetType}/${targetId}`, data),
 
   // Case Notes
   getCaseNotes: (caseId) => apiClient.get(`/api/v1/cases/${caseId}/notes`),

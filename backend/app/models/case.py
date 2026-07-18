@@ -93,3 +93,8 @@ class Case(Base):
         back_populates="case",
         cascade="all, delete-orphan"
     )
+    lead_reviews: Mapped[List["CaseLeadReview"]] = relationship(
+        "CaseLeadReview",
+        back_populates="case",
+        cascade="all, delete-orphan"
+    )

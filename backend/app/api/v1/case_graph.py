@@ -1,5 +1,5 @@
 """Case Graph API — merges all scan graphs in a case"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -14,6 +14,7 @@ from app.models.indicator import Indicator
 from app.models.edge import Edge, scan_findings
 from app.models.case_entity import CaseEntity
 from app.models.case_geolocation import CaseGeolocation
+from app.models.case_lead_review import CaseLeadReview
 from app.models.case_relationship import CaseRelationship
 from app.services.case_geolocations import APPROXIMATE_PRECISIONS, LOCATION_KINDS
 
@@ -122,6 +123,7 @@ def _entity_marker(
 @router.get("/{case_id}/graph")
 async def get_case_graph(
     case_id: uuid.UUID,
+    include_rejected: bool = Query(default=False),
     db: AsyncSession = Depends(get_db)
 ):
     """Return a merged graph of all scans in a case, with per-scan origin tags"""
@@ -138,6 +140,14 @@ async def get_case_graph(
     scan_ids = [s.id for s in scans]
     scan_index = {s.id: {"id": str(s.id), "seed_value": s.seed_value, "seed_kind": s.seed_kind} for s in scans}
 
+    result = await db.execute(select(CaseLeadReview).where(CaseLeadReview.case_id == case_id))
+    review_map = {(review.target_type, review.target_id): review for review in result.scalars().all()}
+    rejected_indicators = {
+        target_id
+        for (target_type, target_id), review in review_map.items()
+        if target_type == "indicator" and review.review_status == "rejected"
+    }
+
     # Build edge map and collect indicator ids, tracking which scans each edge appears in
     edge_map: dict[uuid.UUID, dict] = {}
     indicator_scan_map: dict[uuid.UUID, set] = {}
@@ -152,6 +162,11 @@ async def get_case_graph(
         rows = result.all()
 
         for edge, scan_id in rows:
+            edge_review = review_map.get(("graph_edge", edge.id))
+            if edge_review and edge_review.review_status == "rejected" and not include_rejected:
+                continue
+            if not include_rejected and (edge.src_id in rejected_indicators or edge.dst_id in rejected_indicators):
+                continue
             if edge.id not in edge_map:
                 edge_map[edge.id] = {
                     "id": str(edge.id),
@@ -161,7 +176,9 @@ async def get_case_graph(
                     "confidence": float(edge.confidence),
                     "source_module": edge.source_module,
                     "source_type": "scan",
-                    "verification_status": "confirmed",
+                    "verification_status": edge_review.review_status if edge_review else "needs_review",
+                    "promoted_entity_id": str(edge_review.promoted_entity_id) if edge_review and edge_review.promoted_entity_id else None,
+                    "merged_entity_id": str(edge_review.merged_entity_id) if edge_review and edge_review.merged_entity_id else None,
                     "evidence": edge.evidence,
                     "scan_origins": [],
                 }
@@ -181,8 +198,12 @@ async def get_case_graph(
     else:
         indicators = []
 
-    nodes = [
-        {
+    nodes = []
+    for ind in indicators:
+        review = review_map.get(("indicator", ind.id))
+        if review and review.review_status == "rejected" and not include_rejected:
+            continue
+        nodes.append({
             "id": str(ind.id),
             "graph_node_type": "indicator",
             "kind": ind.kind,
@@ -191,16 +212,20 @@ async def get_case_graph(
             "meta": ind.meta or {},
             "confidence": float(ind.confidence) if ind.confidence else None,
             "source_type": "scan",
-            "verification_status": "confirmed",
+            "verification_status": review.review_status if review else "needs_review",
+            "promoted_entity_id": str(review.promoted_entity_id) if review and review.promoted_entity_id else None,
+            "merged_entity_id": str(review.merged_entity_id) if review and review.merged_entity_id else None,
             "scan_origins": [scan_index[sid]["seed_value"] for sid in indicator_scan_map.get(ind.id, [])],
-        }
-        for ind in indicators
-    ]
+        })
 
     result = await db.execute(
         select(CaseEntity).where(CaseEntity.case_id == case_id).order_by(CaseEntity.created_at)
     )
     manual_entities = result.scalars().all()
+    hidden_manual_entity_ids = {
+        entity.id for entity in manual_entities
+        if entity.verification_status == "rejected" and not include_rejected
+    }
     nodes.extend(
         {
             "id": str(entity.id),
@@ -221,6 +246,7 @@ async def get_case_graph(
             "updated_at": entity.updated_at.isoformat(),
         }
         for entity in manual_entities
+        if entity.id not in hidden_manual_entity_ids
     )
 
     result = await db.execute(
@@ -246,6 +272,12 @@ async def get_case_graph(
             "updated_at": rel.updated_at.isoformat(),
         }
         for rel in result.scalars().all()
+        if include_rejected
+        or (
+            rel.verification_status != "rejected"
+            and not (rel.from_node_type == "entity" and rel.from_node_id in hidden_manual_entity_ids)
+            and not (rel.to_node_type == "entity" and rel.to_node_id in hidden_manual_entity_ids)
+        )
     ]
 
     return {
