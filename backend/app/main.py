@@ -8,7 +8,7 @@ from app.core.database import engine, Base
 from app.core.queue import close_queue
 from app.core.redis import close_redis
 from app.api.v1 import cases, scans, modules, graph, investigations, websocket, scan_graph, scan_templates, export
-from app.api.v1 import reports, case_notes, case_graph, case_entities, case_timeline, case_geolocations, case_leads, evidence, scan_children, integrations, stats, ai
+from app.api.v1 import reports, case_notes, case_graph, case_entities, case_timeline, case_geolocations, case_leads, case_dossier, evidence, scan_children, integrations, stats, ai
 
 
 @asynccontextmanager
@@ -60,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(case_entities.router, prefix="/api/v1/cases", tags=["Cases"])
     app.include_router(case_geolocations.router, prefix="/api/v1/cases", tags=["Geolocations"])
     app.include_router(case_leads.router, prefix="/api/v1/cases", tags=["Leads"])
+    app.include_router(case_dossier.router, prefix="/api/v1/cases", tags=["Dossier"])
     app.include_router(case_timeline.router, prefix="/api/v1/cases", tags=["Timeline"])
     app.include_router(evidence.router, prefix="/api/v1/cases", tags=["Evidence"])
     app.include_router(reports.router, prefix="/api/v1/cases", tags=["Reports"])

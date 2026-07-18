@@ -14,6 +14,7 @@ from app.models.edge import Edge, scan_findings
 from app.models.indicator import Indicator
 from app.models.report import Report
 from app.models.scan import Scan
+from app.api.v1.case_dossier import get_case_dossier
 from app.schemas.report import ReportCreate, ReportResponse
 from app.services.report_renderer import (
     build_snapshot,
@@ -26,6 +27,8 @@ router = APIRouter()
 
 
 def _fmt_dt(value) -> str:
+    if isinstance(value, str):
+        return value
     return value.isoformat() if value else "n/a"
 
 
@@ -37,6 +40,94 @@ def _report_heading(report_format: str, text: str, level: int = 2) -> str:
 
 def _bullet(report_format: str, text: str) -> str:
     return f"- {text}"
+
+
+def _dossier_lines(report_format: str, dossier: dict) -> list[str]:
+    subject = dossier.get("subject", {})
+    summary = dossier.get("summary", {})
+    lines = [
+        _report_heading(report_format, "Subject Dossier").strip(),
+        _bullet(report_format, f"Subject: {subject.get('name') or 'Unknown'}"),
+        _bullet(report_format, f"Confirmed entities: {summary.get('confirmed_entities', 0)}"),
+        _bullet(report_format, f"Verified relationships: {summary.get('verified_relationships', 0)}"),
+        _bullet(report_format, f"Mapped locations: {summary.get('locations', 0)}"),
+        _bullet(report_format, f"Open leads: {summary.get('open_leads', 0)}"),
+    ]
+
+    aliases = subject.get("aliases") or []
+    if aliases:
+        lines.append(_bullet(report_format, f"Aliases: {', '.join(aliases[:8])}"))
+
+    entities = dossier.get("entities") or []
+    lines.append(_report_heading(report_format, "Confirmed Entities").strip())
+    if entities:
+        for entity in entities[:25]:
+            value = entity.get("value") or entity.get("label") or entity.get("id")
+            lines.append(_bullet(
+                report_format,
+                f"{entity.get('type', 'entity')}: {value} ({entity.get('source_type', 'manual')})"
+            ))
+    else:
+        lines.append(_bullet(report_format, "No confirmed entities recorded."))
+
+    relationships = dossier.get("relationships") or []
+    lines.append(_report_heading(report_format, "Verified Relationships").strip())
+    if relationships:
+        for rel in relationships[:25]:
+            source = rel.get("source", {})
+            target = rel.get("target", {})
+            source_label = source.get("label") or source.get("value") or source.get("id")
+            target_label = target.get("label") or target.get("value") or target.get("id")
+            lines.append(_bullet(report_format, f"{source_label} -> {rel.get('relationship')} -> {target_label}"))
+    else:
+        lines.append(_bullet(report_format, "No verified relationships recorded."))
+
+    locations = dossier.get("locations") or []
+    lines.append(_report_heading(report_format, "Locations").strip())
+    if locations:
+        for loc in locations[:20]:
+            coords = f"{loc.get('latitude')}, {loc.get('longitude')}"
+            lines.append(_bullet(report_format, f"{loc.get('label') or loc.get('address_text') or 'Location'} - {coords} ({loc.get('precision')})"))
+    else:
+        lines.append(_bullet(report_format, "No mapped locations recorded."))
+
+    timeline = dossier.get("timeline") or []
+    lines.append(_report_heading(report_format, "Investigation Timeline").strip())
+    if timeline:
+        for event in timeline[:25]:
+            lines.append(_bullet(report_format, f"{_fmt_dt(event.get('occurred_at'))}: {event.get('title')} ({event.get('event_type')})"))
+    else:
+        lines.append(_bullet(report_format, "No confirmed timeline events recorded."))
+
+    evidence = dossier.get("evidence") or []
+    lines.append(_report_heading(report_format, "Evidence Summary").strip())
+    if summary.get("sensitive_evidence_hidden"):
+        lines.append(_bullet(report_format, f"{summary.get('sensitive_evidence_hidden')} sensitive evidence item(s) excluded."))
+    if evidence:
+        for item in evidence[:25]:
+            source = item.get("file_name") or item.get("source_url") or item.get("source_type")
+            lines.append(_bullet(report_format, f"{item.get('title')} - {item.get('evidence_type')} ({source})"))
+    else:
+        lines.append(_bullet(report_format, "No evidence available under current filters."))
+
+    leads = dossier.get("leads") or []
+    lines.append(_report_heading(report_format, "Open Leads").strip())
+    if leads:
+        for lead in leads[:25]:
+            lines.append(_bullet(report_format, f"{lead.get('label')} - {lead.get('review_status')} ({lead.get('target_type')})"))
+    else:
+        lines.append(_bullet(report_format, "No open leads."))
+
+    scans = dossier.get("scans") or []
+    lines.append(_report_heading(report_format, "Scan Provenance").strip())
+    if scans:
+        for scan in scans[:20]:
+            source = scan.get("source_node_label") or scan.get("launch_source") or "case"
+            lines.append(_bullet(report_format, f"{scan.get('seed_value')} - {scan.get('status')} ({source})"))
+    else:
+        lines.append(_bullet(report_format, "No scans linked to this dossier."))
+
+    return lines
 
 
 async def _load_case_data(case: Case, db: AsyncSession):
@@ -84,6 +175,9 @@ async def _load_case_data(case: Case, db: AsyncSession):
 async def generate_markdown_content(case: Case, report_data: ReportCreate, db: AsyncSession) -> str:
     report_format = report_data.report_format
     scans, indicators, edges, notes = await _load_case_data(case, db)
+    dossier = None
+    if report_data.report_type in {"dossier", "full"}:
+        dossier = await get_case_dossier(case.id, include_sensitive=False, db=db)
 
     title = report_data.title or f"{case.title} Report"
     lines = [
@@ -96,6 +190,9 @@ async def generate_markdown_content(case: Case, report_data: ReportCreate, db: A
 
     if case.description:
         lines.extend([_report_heading(report_format, "Case Description").strip(), case.description])
+
+    if dossier:
+        lines.extend(_dossier_lines(report_format, dossier))
 
     lines.extend([
         _report_heading(report_format, "Scan Summary").strip(),
@@ -194,6 +291,8 @@ async def create_report(case_id: uuid.UUID, report_data: ReportCreate, db: Async
 
     scans, indicators, edges, notes = await _load_case_data(case, db)
     snapshot = build_snapshot(case, scans, indicators, edges, notes)
+    if report_data.report_type in {"dossier", "full"}:
+        snapshot["dossier"] = await get_case_dossier(case.id, include_sensitive=False, db=db)
 
     safe_fmt = "markdown" if report_data.report_format in {"html", "pdf"} else report_data.report_format
     content = await generate_markdown_content(

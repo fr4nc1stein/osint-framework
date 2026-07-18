@@ -6,6 +6,7 @@ import GraphVisualization from '../components/GraphVisualization.vue'
 import GraphSidebar from '../components/GraphSidebar.vue'
 import GraphNodePanel from '../components/GraphNodePanel.vue'
 import CaseMapView from '../components/CaseMapView.vue'
+import CaseDossierView from '../components/CaseDossierView.vue'
 import CreateScanModal from '../components/CreateScanModal.vue'
 import CaseEditModal from '../components/CaseEditModal.vue'
 import { api } from '../api/client'
@@ -16,7 +17,7 @@ const casesStore = useCasesStore()
 
 const caseId    = computed(() => route.params.id)
 const activeTab = ref('scans')
-const tabs      = ['scans', 'graph', 'leads', 'map', 'timeline', 'evidence', 'notes', 'reports']
+const tabs      = ['scans', 'dossier', 'graph', 'leads', 'map', 'timeline', 'evidence', 'notes', 'reports']
 
 const showScanModal  = ref(false)
 const showEditModal  = ref(false)
@@ -35,6 +36,7 @@ const showEvidenceModal = ref(false)
 const showTimelineModal = ref(false)
 const showLocationModal = ref(false)
 const entityRelationNode = ref(null)
+const editingEntityNode = ref(null)
 const evidenceTarget = ref(null)
 const timelineTarget = ref(null)
 const locationTarget = ref(null)
@@ -55,6 +57,7 @@ const leadMergeTargets = ref({})
 const leadActionError = ref('')
 const selectedLeadKeys = ref([])
 const bulkLeadActionLoading = ref(false)
+const dossierIncludeSensitive = ref(false)
 
 onMounted(async () => {
   await loadCase(caseId.value)
@@ -70,6 +73,7 @@ watch(
       showNodeScan.value = false
       nodeScanKind.value = 'domain'
       nodeScanSource.value = null
+      dossierIncludeSensitive.value = false
       selectedLeadKeys.value = []
       await loadCase(nextCaseId)
     }
@@ -99,6 +103,7 @@ const evidence    = computed(() => casesStore.caseEvidence)
 const timelineEvents = computed(() => casesStore.caseTimelineEvents)
 const caseGraph   = computed(() => casesStore.caseGraph)
 const caseMap     = computed(() => casesStore.caseMap)
+const caseDossier = computed(() => casesStore.caseDossier)
 const caseLeads   = computed(() => casesStore.caseLeads)
 const nodeParentScanId = computed(() => resolveNodeParentScanId(scanFromNode.value))
 const graphNodes = computed(() => caseGraph.value?.nodes ?? [])
@@ -215,6 +220,9 @@ function childScans(all, pid) { return all.filter(s => s.parent_scan_id === pid)
 
 async function switchTab(tab) {
   activeTab.value = tab
+  if (tab === 'dossier' && casesStore.caseDossierCaseId !== currentCaseId()) {
+    await loadDossier()
+  }
   if (tab === 'graph' && casesStore.caseGraphCaseId !== currentCaseId()) {
     await casesStore.fetchCaseGraph(currentCaseId())
   }
@@ -230,6 +238,17 @@ async function switchTab(tab) {
   if (tab === 'leads' && casesStore.caseLeadsCaseId !== currentCaseId()) {
     await refreshLeads()
   }
+}
+
+async function loadDossier() {
+  await casesStore.fetchCaseDossier(currentCaseId(), {
+    include_sensitive: dossierIncludeSensitive.value,
+  })
+}
+
+async function toggleDossierSensitive() {
+  dossierIncludeSensitive.value = !dossierIncludeSensitive.value
+  await loadDossier()
 }
 
 async function addNote() {
@@ -293,6 +312,60 @@ function defaultEntityForm() {
     latitude: '',
     longitude: '',
     location_precision: 'unknown',
+    subject_profile: false,
+    custom_properties: [{ key: '', value: '' }],
+  }
+}
+
+const ENTITY_FORM_SYSTEM_PROPERTY_KEYS = new Set([
+  'address',
+  'address_text',
+  'lat',
+  'latitude',
+  'lng',
+  'lon',
+  'longitude',
+  'location_note',
+  'location_precision',
+  'precision',
+  'subject_profile',
+])
+
+function customPropertiesFromMeta(meta = {}) {
+  const rows = Object.entries(meta)
+    .filter(([key]) => !ENTITY_FORM_SYSTEM_PROPERTY_KEYS.has(key))
+    .map(([key, value]) => ({
+      key,
+      value: typeof value === 'string' ? value : JSON.stringify(value),
+    }))
+  return rows.length ? rows : [{ key: '', value: '' }]
+}
+
+function parsePropertyValue(value) {
+  const trimmed = String(value ?? '').trim()
+  if (trimmed === '') return ''
+  if (trimmed === 'true') return true
+  if (trimmed === 'false') return false
+  if (trimmed === 'null') return null
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed)
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    try {
+      return JSON.parse(trimmed)
+    } catch {
+      return value
+    }
+  }
+  return value
+}
+
+function addEntityPropertyRow() {
+  entityForm.value.custom_properties.push({ key: '', value: '' })
+}
+
+function removeEntityPropertyRow(index) {
+  entityForm.value.custom_properties.splice(index, 1)
+  if (!entityForm.value.custom_properties.length) {
+    entityForm.value.custom_properties.push({ key: '', value: '' })
   }
 }
 
@@ -591,6 +664,7 @@ function nodeById(id) {
 }
 
 function openEntityModal(connectedNode = null, defaults = {}) {
+  editingEntityNode.value = null
   entityRelationNode.value = connectedNode
   entityForm.value = { ...defaultEntityForm(), ...defaults }
   showEntityModal.value = true
@@ -598,6 +672,29 @@ function openEntityModal(connectedNode = null, defaults = {}) {
 
 function openMapEntityModal(defaults = {}) {
   openEntityModal(null, defaults)
+}
+
+function openEntityEditor(node) {
+  if (!node || node.graph_node_type !== 'entity') return
+  const meta = node.meta || {}
+  editingEntityNode.value = node
+  entityRelationNode.value = null
+  entityForm.value = {
+    ...defaultEntityForm(),
+    type: node.kind || 'person',
+    label: node.label || node.value || '',
+    value: node.value || '',
+    description: node.description || '',
+    confidence: node.confidence == null ? '' : String(node.confidence),
+    verification_status: node.verification_status || 'lead',
+    address_text: meta.address_text || meta.address || '',
+    latitude: meta.latitude ?? meta.lat ?? '',
+    longitude: meta.longitude ?? meta.lon ?? meta.lng ?? '',
+    location_precision: meta.location_precision || meta.precision || 'unknown',
+    subject_profile: Boolean(meta.subject_profile),
+    custom_properties: customPropertiesFromMeta(meta),
+  }
+  showEntityModal.value = true
 }
 
 function openRelationshipModal(sourceNode = null) {
@@ -608,6 +705,15 @@ function openRelationshipModal(sourceNode = null) {
 
 async function submitEntity() {
   const confidence = entityForm.value.confidence === '' ? null : Number(entityForm.value.confidence)
+  const properties = {}
+  for (const row of entityForm.value.custom_properties || []) {
+    const key = String(row.key || '').trim()
+    if (!key) continue
+    properties[key] = parsePropertyValue(row.value)
+  }
+  if (entityForm.value.subject_profile) {
+    properties.subject_profile = true
+  }
   const payload = {
     type: entityForm.value.type,
     label: entityForm.value.label,
@@ -615,7 +721,7 @@ async function submitEntity() {
     description: entityForm.value.description || null,
     confidence,
     verification_status: entityForm.value.verification_status,
-    properties: {},
+    properties,
   }
 
   if (entityForm.value.address_text) payload.properties.address_text = entityForm.value.address_text
@@ -630,10 +736,20 @@ async function submitEntity() {
     payload.relationship_label = entityForm.value.relationship_label || null
   }
 
-  await casesStore.createCaseEntity(currentCaseId(), payload)
+  if (editingEntityNode.value) {
+    await casesStore.updateCaseEntity(currentCaseId(), editingEntityNode.value.id, payload)
+  } else {
+    await casesStore.createCaseEntity(currentCaseId(), payload)
+  }
   showEntityModal.value = false
   entityRelationNode.value = null
-  selectedNode.value = null
+  const updatedEntityId = editingEntityNode.value?.id
+  editingEntityNode.value = null
+  if (updatedEntityId) {
+    selectedNode.value = graphNodes.value.find(node => node.id === updatedEntityId) || null
+  } else {
+    selectedNode.value = null
+  }
   if (activeTab.value === 'map') {
     await casesStore.fetchCaseMap(currentCaseId())
   }
@@ -1111,6 +1227,7 @@ function evidenceTimelineTarget(item) {
             @click="switchTab(tab)">
             {{ tab }}
             <span v-if="tab === 'scans'  && scans.length"   class="ml-1.5 badge badge-blue">{{ scans.length }}</span>
+            <span v-if="tab === 'dossier' && caseDossier?.summary?.open_leads" class="ml-1.5 badge badge-amber">{{ caseDossier.summary.open_leads }}</span>
             <span v-if="tab === 'leads' && caseLeads?.counts?.open" class="ml-1.5 badge badge-amber">{{ caseLeads.counts.open }}</span>
             <span v-if="tab === 'map' && caseMap?.counts?.markers" class="ml-1.5 badge badge-green">{{ caseMap.counts.markers }}</span>
             <span v-if="tab === 'evidence' && evidence.length" class="ml-1.5 badge badge-slate">{{ evidence.length }}</span>
@@ -1120,8 +1237,22 @@ function evidenceTimelineTarget(item) {
         </div>
       </div>
 
+      <!-- ── DOSSIER TAB ───────────────────────────────────── -->
+      <div v-if="activeTab === 'dossier'" class="flex-1 min-h-0 overflow-y-auto p-4">
+        <CaseDossierView
+          :dossier="caseDossier"
+          :loading="casesStore.loading"
+          :include-sensitive="dossierIncludeSensitive"
+          @toggle-sensitive="toggleDossierSensitive"
+          @open-graph="switchTab('graph')"
+          @open-map="switchTab('map')"
+          @open-evidence="switchTab('evidence')"
+          @open-leads="switchTab('leads')"
+        />
+      </div>
+
       <!-- ── GRAPH TAB — 3-column full-height ──────────────── -->
-      <div v-if="activeTab === 'graph'" class="flex-1 flex overflow-hidden">
+      <div v-else-if="activeTab === 'graph'" class="flex-1 flex overflow-hidden">
         <!-- Left sidebar -->
         <GraphSidebar
           :graph-data="caseGraph"
@@ -1188,6 +1319,7 @@ function evidenceTimelineTarget(item) {
           @add-timeline-event="openTimelineModal"
           @preview-evidence="previewEvidence"
           @download-evidence="downloadEvidence"
+          @edit-node="openEntityEditor"
           @edit-location="openLocationEditor"
           @open-map-location="openMapForNode"
         />
@@ -1581,9 +1713,9 @@ function evidenceTimelineTarget(item) {
   <!-- Manual entity modal -->
   <Teleport to="body">
     <div v-if="showEntityModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" @click.self="showEntityModal = false">
-      <div class="card p-6 w-full max-w-lg mx-4">
+      <div class="card p-6 w-full max-w-2xl mx-4 max-h-[92vh] overflow-y-auto">
         <h2 class="text-lg font-semibold mb-1" style="color: var(--text-primary)">
-          {{ entityRelationNode ? 'Add Connected Node' : 'Add Manual Node' }}
+          {{ editingEntityNode ? 'Edit Manual Node' : entityRelationNode ? 'Add Connected Node' : 'Add Manual Node' }}
         </h2>
         <p v-if="entityRelationNode" class="text-xs mb-4" style="color: var(--text-muted)">
           Connecting from {{ entityRelationNode.kind }}: {{ entityRelationNode.value }}
@@ -1662,6 +1794,27 @@ function evidenceTimelineTarget(item) {
             <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Description</label>
             <textarea v-model="entityForm.description" class="input h-20 resize-none" placeholder="Analyst note or source context" />
           </div>
+          <label class="flex items-start gap-2 rounded border p-3 cursor-pointer"
+            style="border-color: var(--border); background-color: var(--bg-primary); color: var(--text-secondary)">
+            <input v-model="entityForm.subject_profile" type="checkbox" class="mt-1" />
+            <span class="text-sm">
+              <span class="block font-medium" style="color: var(--text-primary)">Use in subject profile</span>
+              <span class="block text-xs" style="color: var(--text-muted)">Prioritize this node in the dossier subject panel.</span>
+            </span>
+          </label>
+          <div class="rounded border p-3 space-y-2" style="border-color: var(--border); background-color: var(--bg-primary)">
+            <div class="flex items-center justify-between gap-2">
+              <label class="block text-sm font-medium" style="color: var(--text-secondary)">Custom Properties</label>
+              <button type="button" class="btn-secondary text-xs" @click="addEntityPropertyRow">Add Pair</button>
+            </div>
+            <div class="space-y-2">
+              <div v-for="(row, index) in entityForm.custom_properties" :key="index" class="grid grid-cols-[1fr_1.3fr_auto] gap-2">
+                <input v-model="row.key" class="input text-sm" placeholder="key" />
+                <input v-model="row.value" class="input text-sm" placeholder="value" />
+                <button type="button" class="btn-ghost text-xs text-red-400" @click="removeEntityPropertyRow(index)">Remove</button>
+              </div>
+            </div>
+          </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Confidence</label>
@@ -1684,7 +1837,7 @@ function evidenceTimelineTarget(item) {
           </div>
           <div class="flex justify-end gap-3 pt-2">
             <button type="button" class="btn-secondary" @click="showEntityModal = false">Cancel</button>
-            <button type="submit" class="btn-primary">{{ entityRelationNode ? 'Create Connected Node' : 'Create Node' }}</button>
+            <button type="submit" class="btn-primary">{{ editingEntityNode ? 'Save Node' : entityRelationNode ? 'Create Connected Node' : 'Create Node' }}</button>
           </div>
         </form>
       </div>
@@ -2038,6 +2191,7 @@ function evidenceTimelineTarget(item) {
                 <option value="summary">Executive Summary</option>
                 <option value="technical">Technical Details</option>
                 <option value="timeline">Timeline</option>
+                <option value="dossier">Subject Dossier / PI Report</option>
                 <option value="full">Full Report</option>
               </select>
             </div>

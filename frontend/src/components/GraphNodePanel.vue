@@ -10,6 +10,7 @@ const props = defineProps({
 
 const emit = defineEmits([
   'close',
+  'edit-node',
   'scan-from-node',
   'attach-evidence',
   'add-timeline-event',
@@ -326,6 +327,17 @@ const KIND_BADGE = {
 
     <!-- Scan from node action -->
     <div class="shrink-0 px-4 py-3 border-t" style="border-color: var(--border)">
+      <button
+        v-if="isManualEntity"
+        class="btn-secondary w-full flex items-center justify-center gap-2 text-sm mb-2"
+        @click="emit('edit-node', node)"
+      >
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path d="m16.862 4.487 1.688-1.688a1.875 1.875 0 1 1 2.652 2.652L9.38 17.273 5.75 18.25l.977-3.63L16.862 4.487Z"/>
+          <path d="M19.5 7.125 16.875 4.5"/>
+        </svg>
+        Edit node
+      </button>
       <button class="btn-secondary w-full flex items-center justify-center gap-2 text-sm mb-2"
         @click="emit('add-timeline-event', node)">
         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">

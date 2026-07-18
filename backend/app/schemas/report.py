@@ -9,7 +9,7 @@ class ReportCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     content: Optional[str] = None
     report_format: str = Field(default="markdown", pattern="^(markdown|text|html|pdf)$")
-    report_type: str = Field(default="summary", pattern="^(summary|technical|timeline|full)$")
+    report_type: str = Field(default="summary", pattern="^(summary|technical|timeline|dossier|full)$")
     generated_by: str = Field(default="user")
 
 

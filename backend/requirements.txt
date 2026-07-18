@@ -36,6 +36,7 @@ pyaes==1.6.1
 
 # Report rendering
 markdown==3.6
+reportlab==4.2.5
 
 # Evidence storage and previews
 minio==7.2.7

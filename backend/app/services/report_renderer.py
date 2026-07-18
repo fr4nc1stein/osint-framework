@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import io
 from datetime import datetime
+from html import escape as html_escape
 from typing import Any, Dict
+from xml.sax.saxutils import escape as xml_escape
 
 import markdown as md_lib
 
@@ -114,6 +116,8 @@ _HTML_TEMPLATE = """\
 </div>
 
 {description_block}
+
+{dossier_block}
 
 <h2>Scan Summary</h2>
 {scans_block}
@@ -287,6 +291,120 @@ def _followup_block(edges: list, scans: list, report_type: str) -> str:
     return f"<h2>Analyst Follow-Up</h2><ul>{rows}</ul>"
 
 
+def _dossier_block(dossier: dict | None, report_type: str) -> str:
+    if not dossier or report_type not in {"dossier", "full"}:
+        return ""
+
+    def esc(value) -> str:
+        return html_escape(str(value or ""))
+
+    subject = dossier.get("subject", {})
+    summary = dossier.get("summary", {})
+    metrics = (
+        "<table><thead><tr><th>Subject</th><th>Confirmed Entities</th><th>Verified Links</th>"
+        "<th>Locations</th><th>Open Leads</th></tr></thead><tbody><tr>"
+        f"<td>{esc(subject.get('name') or 'Unknown')}</td>"
+        f"<td>{summary.get('confirmed_entities', 0)}</td>"
+        f"<td>{summary.get('verified_relationships', 0)}</td>"
+        f"<td>{summary.get('locations', 0)}</td>"
+        f"<td>{summary.get('open_leads', 0)}</td>"
+        "</tr></tbody></table>"
+    )
+
+    relationships = dossier.get("relationships") or []
+    relationship_rows = "".join(
+        "<tr>"
+        f"<td>{esc((rel.get('source') or {}).get('label') or (rel.get('source') or {}).get('value') or (rel.get('source') or {}).get('id'))}</td>"
+        f"<td>{esc(rel.get('relationship'))}</td>"
+        f"<td>{esc((rel.get('target') or {}).get('label') or (rel.get('target') or {}).get('value') or (rel.get('target') or {}).get('id'))}</td>"
+        f"<td>{esc(rel.get('verification_status'))}</td>"
+        "</tr>"
+        for rel in relationships[:25]
+    )
+    relationships_block = (
+        "<h2>Verified Relationships</h2><table><thead><tr><th>Source</th><th>Relationship</th><th>Target</th><th>Status</th></tr></thead>"
+        f"<tbody>{relationship_rows}</tbody></table>"
+        if relationship_rows else
+        "<h2>Verified Relationships</h2><p style='color:#94a3b8'>No verified relationships recorded.</p>"
+    )
+
+    locations = dossier.get("locations") or []
+    location_rows = "".join(
+        "<tr>"
+        f"<td>{esc(loc.get('label') or loc.get('address_text') or 'Location')}</td>"
+        f"<td>{esc(loc.get('latitude'))}, {esc(loc.get('longitude'))}</td>"
+        f"<td>{esc(loc.get('precision'))}</td>"
+        f"<td>{esc(loc.get('verification_status'))}</td>"
+        "</tr>"
+        for loc in locations[:20]
+    )
+    locations_block = (
+        "<h2>Locations</h2><table><thead><tr><th>Label</th><th>Coordinates</th><th>Precision</th><th>Status</th></tr></thead>"
+        f"<tbody>{location_rows}</tbody></table>"
+        if location_rows else
+        "<h2>Locations</h2><p style='color:#94a3b8'>No mapped locations recorded.</p>"
+    )
+
+    timeline = dossier.get("timeline") or []
+    timeline_rows = "".join(
+        "<tr>"
+        f"<td>{_fmt_dt(event.get('occurred_at'))}</td>"
+        f"<td>{esc(event.get('title'))}</td>"
+        f"<td>{esc(event.get('event_type'))}</td>"
+        f"<td>{esc((event.get('location') or {}).get('label'))}</td>"
+        "</tr>"
+        for event in timeline[:25]
+    )
+    timeline_block = (
+        "<h2>Investigation Timeline</h2><table><thead><tr><th>When</th><th>Event</th><th>Type</th><th>Location</th></tr></thead>"
+        f"<tbody>{timeline_rows}</tbody></table>"
+        if timeline_rows else
+        "<h2>Investigation Timeline</h2><p style='color:#94a3b8'>No confirmed timeline events recorded.</p>"
+    )
+
+    evidence = dossier.get("evidence") or []
+    hidden = summary.get("sensitive_evidence_hidden", 0)
+    sensitive_note = (
+        f"<p><span class='badge badge-amber'>{hidden} sensitive evidence item(s) excluded</span></p>"
+        if hidden else ""
+    )
+    evidence_rows = "".join(
+        "<tr>"
+        f"<td>{esc(item.get('title'))}</td>"
+        f"<td>{esc(item.get('evidence_type'))}</td>"
+        f"<td>{esc(item.get('file_name') or item.get('source_url') or item.get('source_type'))}</td>"
+        f"<td>{esc(item.get('chain_of_custody_status'))}</td>"
+        "</tr>"
+        for item in evidence[:25]
+    )
+    evidence_block = (
+        "<h2>Evidence Summary</h2>"
+        f"{sensitive_note}<table><thead><tr><th>Title</th><th>Type</th><th>Source</th><th>Custody</th></tr></thead>"
+        f"<tbody>{evidence_rows}</tbody></table>"
+        if evidence_rows else
+        f"<h2>Evidence Summary</h2>{sensitive_note}<p style='color:#94a3b8'>No evidence available under current filters.</p>"
+    )
+
+    leads = dossier.get("leads") or []
+    lead_rows = "".join(
+        "<tr>"
+        f"<td>{esc(lead.get('label'))}</td>"
+        f"<td>{esc(lead.get('target_type'))}</td>"
+        f"<td>{esc(lead.get('review_status'))}</td>"
+        f"<td>{esc(lead.get('source_type'))}</td>"
+        "</tr>"
+        for lead in leads[:25]
+    )
+    leads_block = (
+        "<h2>Open Leads</h2><table><thead><tr><th>Lead</th><th>Target</th><th>Status</th><th>Source</th></tr></thead>"
+        f"<tbody>{lead_rows}</tbody></table>"
+        if lead_rows else
+        "<h2>Open Leads</h2><p style='color:#94a3b8'>No open leads.</p>"
+    )
+
+    return f"<h2>Subject Dossier</h2>{metrics}{relationships_block}{locations_block}{timeline_block}{evidence_block}{leads_block}"
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -364,6 +482,7 @@ def render_html(snapshot: Dict[str, Any], title: str, report_type: str) -> str:
         priority_cls=_PRIORITY_CLS.get(case.get("priority", ""), "slate"),
         generated_at=_fmt_dt(gen_at),
         description_block=desc_block,
+        dossier_block=_dossier_block(snapshot.get("dossier"), report_type),
         scans_block=_scans_table(scans),
         indicators_block=_indicators_table(inds, report_type),
         relationships_block=_relationships_table(edges, ind_map, report_type),
@@ -389,6 +508,7 @@ def render_pdf(snapshot: Dict[str, Any], title: str, report_type: str) -> bytes:
     inds  = snapshot.get("indicators", [])
     edges = snapshot.get("edges", [])
     notes = snapshot.get("notes", [])
+    dossier = snapshot.get("dossier")
     gen_at = snapshot.get("generated_at", "")
 
     buf = io.BytesIO()
@@ -445,6 +565,110 @@ def render_pdf(snapshot: Dict[str, Any], title: str, report_type: str) -> bytes:
     if case.get("description"):
         story.append(Paragraph("Case Description", h2))
         story.append(Paragraph(case["description"], body))
+
+    if dossier and report_type in {"dossier", "full"}:
+        subject = dossier.get("subject", {})
+        summary = dossier.get("summary", {})
+        story.append(Paragraph("Subject Dossier", h2))
+        story.append(Paragraph(
+            f"<b>Subject:</b> {xml_escape(str(subject.get('name') or 'Unknown'))} &nbsp; "
+            f"<b>Confirmed entities:</b> {summary.get('confirmed_entities', 0)} &nbsp; "
+            f"<b>Verified links:</b> {summary.get('verified_relationships', 0)} &nbsp; "
+            f"<b>Locations:</b> {summary.get('locations', 0)} &nbsp; "
+            f"<b>Open leads:</b> {summary.get('open_leads', 0)}",
+            body,
+        ))
+
+        relationships = dossier.get("relationships") or []
+        story.append(Paragraph("Verified Relationships", h2))
+        if relationships:
+            data = [["Source", "Relationship", "Target", "Status"]]
+            for rel in relationships[:25]:
+                source = rel.get("source") or {}
+                target = rel.get("target") or {}
+                data.append([
+                    Paragraph(xml_escape(str(source.get("label") or source.get("value") or source.get("id") or "")), body),
+                    xml_escape(str(rel.get("relationship") or "")),
+                    Paragraph(xml_escape(str(target.get("label") or target.get("value") or target.get("id") or "")), body),
+                    xml_escape(str(rel.get("verification_status") or "")),
+                ])
+            t = Table(data, colWidths=[45*mm, 35*mm, 45*mm, 34*mm])
+            t.setStyle(tbl_style())
+            story.append(t)
+        else:
+            story.append(Paragraph("No verified relationships recorded.", muted))
+
+        locations = dossier.get("locations") or []
+        story.append(Paragraph("Locations", h2))
+        if locations:
+            data = [["Label", "Coordinates", "Precision", "Status"]]
+            for loc in locations[:20]:
+                data.append([
+                    Paragraph(xml_escape(str(loc.get("label") or loc.get("address_text") or "Location")), body),
+                    f"{loc.get('latitude')}, {loc.get('longitude')}",
+                    xml_escape(str(loc.get("precision") or "")),
+                    xml_escape(str(loc.get("verification_status") or "")),
+                ])
+            t = Table(data, colWidths=[58*mm, 42*mm, 26*mm, 33*mm])
+            t.setStyle(tbl_style())
+            story.append(t)
+        else:
+            story.append(Paragraph("No mapped locations recorded.", muted))
+
+        timeline = dossier.get("timeline") or []
+        story.append(Paragraph("Investigation Timeline", h2))
+        if timeline:
+            data = [["When", "Event", "Type", "Location"]]
+            for event in timeline[:25]:
+                location = event.get("location") or {}
+                data.append([
+                    _fmt_dt(event.get("occurred_at")),
+                    Paragraph(xml_escape(str(event.get("title") or "")), body),
+                    xml_escape(str(event.get("event_type") or "")),
+                    Paragraph(xml_escape(str(location.get("label") or "")), body),
+                ])
+            t = Table(data, colWidths=[36*mm, 62*mm, 30*mm, 31*mm])
+            t.setStyle(tbl_style())
+            story.append(t)
+        else:
+            story.append(Paragraph("No confirmed timeline events recorded.", muted))
+
+        evidence = dossier.get("evidence") or []
+        story.append(Paragraph("Evidence Summary", h2))
+        hidden = summary.get("sensitive_evidence_hidden", 0)
+        if hidden:
+            story.append(Paragraph(f"{hidden} sensitive evidence item(s) excluded.", muted))
+        if evidence:
+            data = [["Title", "Type", "Source", "Custody"]]
+            for item in evidence[:25]:
+                data.append([
+                    Paragraph(xml_escape(str(item.get("title") or "")), body),
+                    xml_escape(str(item.get("evidence_type") or "")),
+                    Paragraph(xml_escape(str(item.get("file_name") or item.get("source_url") or item.get("source_type") or "")), body),
+                    xml_escape(str(item.get("chain_of_custody_status") or "")),
+                ])
+            t = Table(data, colWidths=[50*mm, 28*mm, 54*mm, 27*mm])
+            t.setStyle(tbl_style())
+            story.append(t)
+        else:
+            story.append(Paragraph("No evidence available under current filters.", muted))
+
+        leads = dossier.get("leads") or []
+        story.append(Paragraph("Open Leads", h2))
+        if leads:
+            data = [["Lead", "Target", "Status", "Source"]]
+            for lead in leads[:25]:
+                data.append([
+                    Paragraph(xml_escape(str(lead.get("label") or "")), body),
+                    xml_escape(str(lead.get("target_type") or "")),
+                    xml_escape(str(lead.get("review_status") or "")),
+                    xml_escape(str(lead.get("source_type") or "")),
+                ])
+            t = Table(data, colWidths=[62*mm, 30*mm, 32*mm, 35*mm])
+            t.setStyle(tbl_style())
+            story.append(t)
+        else:
+            story.append(Paragraph("No open leads.", muted))
 
     # ── Scans ─────────────────────────────────────────────────
     story.append(Paragraph("Scan Summary", h2))

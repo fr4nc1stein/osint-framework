@@ -1,7 +1,7 @@
 # OSIF v2.0 - Phase 3.4 Plan: Skip Tracing, Private Investigation Workspace, Manual Graph, Timeline, Evidence, and Maps
 
 **Date:** 2026-07-14  
-**Status:** In Progress — Phase 3.4A, 3.4B, 3.4C, 3.4D, 3.4E, 3.4F, and 3.4G complete; next slice is Phase 3.4H dossier and PI reports
+**Status:** In Progress — Phase 3.4A through 3.4H complete
 **Focus:** Extend cases from automated OSINT scan containers into full investigation workspaces for skip tracing and private investigation workflows.
 
 ---
@@ -1219,9 +1219,9 @@ Before production use, legal and policy requirements should be reviewed for the 
 
 ### Step 8: Dossier And PI Reports
 
-- [ ] Add subject dossier tab.
-- [ ] Add report sections for timeline, evidence, locations, and verified relationships.
-- [ ] Add include/exclude controls for sensitive evidence.
+- [x] Add subject dossier tab.
+- [x] Add report sections for timeline, evidence, locations, and verified relationships.
+- [x] Add include/exclude controls for sensitive evidence.
 
 ---
 
@@ -1283,7 +1283,7 @@ Before production use, legal and policy requirements should be reviewed for the 
 
 ## Implementation Log
 
-**Last updated:** 2026-07-17
+**Last updated:** 2026-07-18
 
 ### ✅ Plan A — Manual Entities, Manual Relationships, And Graph Merge
 
@@ -1580,3 +1580,95 @@ Validation completed:
 - API smoke test created a temporary manual domain node, validated source-node scan creation rules, persisted a scan with node provenance, verified the case scan list returned the provenance, validated the scan response schema, then deleted the temporary case.
 - API check verified `/api/v1/modules/suggest?node_type=hostname` returns domain-compatible modules with `effective_seed_kind=domain`.
 - Backend health check returned `ok`.
+
+### Plan H — Dossier And PI Reports
+
+Implemented the dossier and PI-style reporting slice:
+
+- Added a case-scoped dossier API:
+  - `GET /api/v1/cases/{case_id}/dossier`
+- Dossier payload now consolidates:
+  - case metadata
+  - subject profile
+  - confirmed manual entities
+  - verified relationships
+  - normalized geolocations
+  - confirmed timeline events
+  - evidence summaries
+  - open leads
+  - scan provenance
+  - type/status counts
+- Sensitive evidence is excluded by default from the dossier API unless `include_sensitive=true` is explicitly requested.
+- Evidence types treated as sensitive by default include:
+  - `legal_document`
+  - `identity_document`
+  - `private_message`
+  - `financial_record`
+- Added the case Dossier tab with a cinematic intelligence-briefing layout:
+  - subject hero
+  - priority/case chips
+  - confirmed entity, verified link, location, and open-lead metrics
+  - subject profile panel
+  - signal composition panel
+  - verified relationship matrix
+  - location board
+  - timeline highlights
+  - evidence locker
+  - open lead list
+  - scan provenance list
+- Added quick actions from the dossier to:
+  - graph
+  - map
+  - evidence
+  - leads
+- Added a dossier sensitive-evidence toggle for analyst view.
+- Added dossier cache invalidation when case entities, relationships, evidence, timeline events, geolocations, or lead reviews change.
+- Added manual entity editing from the graph node side panel.
+- Added manual entity custom key/value properties stored in the existing entity `properties` payload.
+- Added `subject_profile` entity tagging so analysts can choose which manual node should anchor the dossier Subject Profile panel.
+- Updated the dossier subject selector to prioritize entities tagged with `properties.subject_profile=true`.
+- Updated the dossier Subject Profile panel to render custom subject properties while hiding internal map/system keys.
+- Fixed Dossier tab layout ownership so it participates in the same exclusive tab body chain as Graph, Map, and the generic tab content area.
+- Fixed dossier panel clipping by removing the fixed-height clipped grid behavior that hid lower panel data.
+- Added `dossier` as a supported report type.
+- Added `Subject Dossier / PI Report` to the report generation modal.
+- Extended Markdown/text report generation with PI sections:
+  - subject dossier
+  - confirmed entities
+  - verified relationships
+  - locations
+  - investigation timeline
+  - evidence summary
+  - open leads
+  - scan provenance
+- Extended HTML and PDF report rendering to include dossier sections when `report_type=dossier` or `report_type=full`.
+- Added `reportlab` to backend dependencies so PDF report downloads render inside the Docker backend image.
+- Rebuilt the frontend container so `localhost:3000` serves the dossier UI.
+- Rebuilt the backend container so PDF export support is installed.
+
+Validation completed:
+
+- `python3 -m py_compile` passed for new/changed backend dossier, report, renderer, schema, and app modules.
+- `npm --prefix frontend run build` passed.
+- `docker compose -f docker-compose.dev.yml up -d --build frontend` completed.
+- `docker compose -f docker-compose.dev.yml up -d --build backend` completed and installed `reportlab`.
+- Follow-up frontend build passed after the Dossier tab-chain/layout fix.
+- Follow-up frontend container rebuild completed after the Dossier tab-chain/layout fix.
+- Live backend smoke test created a temporary case with:
+  - confirmed person, office, and email entities
+  - verified relationship
+  - confirmed geolocation
+  - confirmed timeline event
+  - public evidence
+  - sensitive identity-document evidence
+- Smoke test verified:
+  - dossier returned 3 confirmed entities
+  - dossier returned at least 1 verified relationship
+  - dossier returned at least 1 location
+  - sensitive evidence was hidden by default
+  - `include_sensitive=true` returned the hidden evidence
+  - dossier PDF download returned 3,223 bytes
+  - dossier HTML download returned 4,338 bytes
+  - temporary smoke case was deleted
+- Follow-up backend smoke test verified a tagged `subject_profile` entity becomes the dossier primary subject and custom properties are returned.
+- Browser-level validation was attempted through the Codex in-app Browser skill, but the `iab` browser connector was unavailable in this session.

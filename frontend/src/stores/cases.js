@@ -12,6 +12,9 @@ export const useCasesStore = defineStore('cases', {
     caseGraphCaseId: null,
     caseMap: null,
     caseMapCaseId: null,
+    caseDossier: null,
+    caseDossierCaseId: null,
+    caseDossierParams: null,
     caseGeolocations: [],
     caseGeolocationsCaseId: null,
     caseEntities: [],
@@ -59,6 +62,9 @@ export const useCasesStore = defineStore('cases', {
           this.caseGraphCaseId = null
           this.caseMap = null
           this.caseMapCaseId = null
+          this.caseDossier = null
+          this.caseDossierCaseId = null
+          this.caseDossierParams = null
           this.caseGeolocations = []
           this.caseGeolocationsCaseId = null
           this.caseEntities = []
@@ -127,6 +133,23 @@ export const useCasesStore = defineStore('cases', {
       return data
     },
 
+    async fetchCaseDossier(caseId, params = undefined) {
+      this.loading = true
+      this.error = null
+      try {
+        const { data } = await api.getCaseDossier(caseId, params)
+        this.caseDossier = data
+        this.caseDossierCaseId = caseId
+        this.caseDossierParams = params || {}
+        return data
+      } catch (e) {
+        this.error = e.response?.data?.detail || e.message
+        throw e
+      } finally {
+        this.loading = false
+      }
+    },
+
     async fetchCaseGeolocations(caseId, params = undefined) {
       const { data } = await api.getCaseGeolocations(caseId, params)
       if (!params?.target_type && !params?.target_id) {
@@ -177,6 +200,7 @@ export const useCasesStore = defineStore('cases', {
       this.caseEntities.unshift(data)
       await this.fetchCaseGraph(caseId)
       this.caseMapCaseId = null
+      this.caseDossierCaseId = null
       return data
     },
 
@@ -186,6 +210,7 @@ export const useCasesStore = defineStore('cases', {
       if (idx !== -1) this.caseEntities.splice(idx, 1, data)
       await this.fetchCaseGraph(caseId)
       this.caseMapCaseId = null
+      this.caseDossierCaseId = null
       return data
     },
 
@@ -194,6 +219,7 @@ export const useCasesStore = defineStore('cases', {
       this.caseEntities = this.caseEntities.filter(e => e.id !== entityId)
       await this.fetchCaseGraph(caseId)
       this.caseMapCaseId = null
+      this.caseDossierCaseId = null
     },
 
     async fetchCaseRelationships(caseId) {
@@ -207,6 +233,7 @@ export const useCasesStore = defineStore('cases', {
       const { data } = await api.createCaseRelationship(caseId, payload)
       this.caseRelationships.unshift(data)
       await this.fetchCaseGraph(caseId)
+      this.caseDossierCaseId = null
       return data
     },
 
@@ -215,6 +242,7 @@ export const useCasesStore = defineStore('cases', {
       const idx = this.caseRelationships.findIndex(r => r.id === relationshipId)
       if (idx !== -1) this.caseRelationships.splice(idx, 1, data)
       await this.fetchCaseGraph(caseId)
+      this.caseDossierCaseId = null
       return data
     },
 
@@ -222,6 +250,7 @@ export const useCasesStore = defineStore('cases', {
       await api.deleteCaseRelationship(caseId, relationshipId)
       this.caseRelationships = this.caseRelationships.filter(r => r.id !== relationshipId)
       await this.fetchCaseGraph(caseId)
+      this.caseDossierCaseId = null
     },
 
     async fetchCaseEvidence(caseId, params = undefined) {
@@ -237,6 +266,7 @@ export const useCasesStore = defineStore('cases', {
       const { data } = await api.createCaseEvidence(caseId, payload)
       this.caseEvidence.unshift(data)
       this.caseMapCaseId = null
+      this.caseDossierCaseId = null
       return data
     },
 
@@ -244,6 +274,7 @@ export const useCasesStore = defineStore('cases', {
       const { data } = await api.uploadCaseEvidence(caseId, formData)
       this.caseEvidence.unshift(data)
       this.caseMapCaseId = null
+      this.caseDossierCaseId = null
       return data
     },
 
@@ -251,6 +282,7 @@ export const useCasesStore = defineStore('cases', {
       await api.deleteCaseEvidence(caseId, evidenceId)
       this.caseEvidence = this.caseEvidence.filter(e => e.id !== evidenceId)
       this.caseMapCaseId = null
+      this.caseDossierCaseId = null
     },
 
     async fetchCaseTimeline(caseId, params = undefined) {
@@ -266,6 +298,7 @@ export const useCasesStore = defineStore('cases', {
       const { data } = await api.createCaseTimelineEvent(caseId, payload)
       this.caseTimelineEvents.unshift(data)
       this.caseMapCaseId = null
+      this.caseDossierCaseId = null
       return data
     },
 
@@ -274,6 +307,7 @@ export const useCasesStore = defineStore('cases', {
       const idx = this.caseTimelineEvents.findIndex(e => e.id === eventId)
       if (idx !== -1) this.caseTimelineEvents.splice(idx, 1, data)
       this.caseMapCaseId = null
+      this.caseDossierCaseId = null
       return data
     },
 
@@ -281,6 +315,7 @@ export const useCasesStore = defineStore('cases', {
       await api.deleteCaseTimelineEvent(caseId, eventId)
       this.caseTimelineEvents = this.caseTimelineEvents.filter(e => e.id !== eventId)
       this.caseMapCaseId = null
+      this.caseDossierCaseId = null
     },
 
     async fetchCaseLeads(caseId, params = undefined) {
@@ -296,6 +331,7 @@ export const useCasesStore = defineStore('cases', {
       this.caseLeadsCaseId = null
       this.caseGraphCaseId = null
       this.caseMapCaseId = null
+      this.caseDossierCaseId = null
       return data
     },
 

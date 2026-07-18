@@ -31,6 +31,7 @@ export const api = {
   getCaseScans: (caseId) => apiClient.get(`/api/v1/cases/${caseId}/scans`),
   getCaseGraph: (caseId) => apiClient.get(`/api/v1/cases/${caseId}/graph`),
   getCaseMap: (caseId) => apiClient.get(`/api/v1/cases/${caseId}/map`),
+  getCaseDossier: (caseId, params) => apiClient.get(`/api/v1/cases/${caseId}/dossier`, { params }),
   getCaseGeolocations: (caseId, params) => apiClient.get(`/api/v1/cases/${caseId}/geolocations`, { params }),
   createCaseGeolocation: (caseId, data) => apiClient.post(`/api/v1/cases/${caseId}/geolocations`, data),
   updateCaseGeolocation: (caseId, geolocationId, data) => apiClient.put(`/api/v1/cases/${caseId}/geolocations/${geolocationId}`, data),
