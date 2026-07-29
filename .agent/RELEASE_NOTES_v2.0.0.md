@@ -1,166 +1,216 @@
-# OSIF v2.0.0 - Web Interface & Enhanced Features 🎉
+# OSIF v2.0.0 — Enterprise OSINT Web Workspace
 
-We're excited to announce OSIF v2.0.0, a major release that transforms OSIF into a dual-interface OSINT platform with a brand new web-based graph visualization system!
-
-## 🌟 Highlights
-
-### 🌐 Web Graph Visualization
-The biggest addition in v2.0.0 is the **interactive web interface** featuring Maltego-style graph visualization:
-
-- **Visual Investigation**: Interactive node-edge graph for exploring relationships
-- **Real-time Updates**: Watch your investigation graph grow as entities are discovered
-- **Multiple Entry Points**: Investigate domains, IPs, emails, and Bitcoin addresses
-- **Smart Interactions**: Click nodes for details, double-click to investigate further
-- **Export Capabilities**: Save your investigation graphs as JSON
-
-![Web Graph Visualization](screenshots/web_graph.png)
-
-### 🛡️ IP Reputation Intelligence
-New **AbuseIPDB integration** provides comprehensive IP threat intelligence:
-
-- Abuse confidence scoring (0-100%)
-- Threat level classification (Low/Medium/High Risk)
-- Recent abuse report history
-- Visual threat indicators in graph
-- Available in both CLI and web interface
-
-### 🔧 Smart Port Management
-Intelligent port conflict detection and resolution:
-
-- Automatically detects when port 5001 is in use
-- Auto-increments to next available port (5001-5005)
-- Clear error messages showing which ports are occupied
-- Manual port selection via `--port` flag
-
-### 📚 Comprehensive Documentation
-1,819 lines of developer documentation added:
-
-- **Architecture Guide** - Complete system design and technical details
-- **Feature Planning** - Roadmap, priorities, and backlog
-- **Development Guide** - Coding standards, workflows, best practices
-- **Contributing Guide** - Professional contribution guidelines
-
-## 🚀 Getting Started
-
-### Quick Start - Web Interface
-
-```bash
-git clone https://github.com/fr4nc1stein/osint-framework.git
-cd osint-framework
-source bin/activate
-pip install -r requirements.txt
-./start_web.sh
-```
-
-Then open http://localhost:5001 in your browser!
-
-### CLI with Web Server
-
-```bash
-./osif  # Web server starts automatically in background
-```
-
-### CLI Only
-
-```bash
-./osif --no-web
-```
-
-## 📦 What's New
-
-### Investigation Capabilities
-
-**Domain Investigation:**
-- Email discovery via Tomba
-- DNS records (A, MX)
-- Subdomain enumeration via Certificate Transparency (crt.sh)
-- Automatic IP resolution for discovered hosts
-
-**IP Investigation:**
-- Geolocation and ISP information (ip-api.com)
-- Reputation checking (AbuseIPDB)
-- Port scanning (Shodan)
-- Hostname discovery
-- Threat level indicators
-
-**Email Investigation:**
-- Domain extraction and linking
-- Prepared for Have I Been Pwned integration
-
-**Bitcoin Investigation:**
-- Wallet balance checking
-- Transaction history via blockchain.info
-
-### Technical Improvements
-
-- **Flask REST API** with CORS support
-- **vis.js** for interactive graph rendering
-- **Background server management** in CLI
-- **Enhanced error handling** and validation
-- **Modern responsive UI** design
-
-## 📊 By the Numbers
-
-- **5,548+ lines** of new code and documentation
-- **19 new files** added
-- **2,543 lines** of documentation
-- **3,005+ lines** of code
-- **4 comprehensive** developer guides
-
-## 🔗 New Integrations
-
-- **AbuseIPDB** - IP reputation and threat intelligence
-- **crt.sh** - Certificate Transparency for subdomain discovery
-- **ip-api.com** - IP geolocation services
-- **Enhanced Tomba** - Email discovery and verification
-
-## 🛠️ Breaking Changes
-
-None! The CLI interface remains fully backward compatible. The web interface is an addition, not a replacement.
-
-## 📝 Documentation
-
-- **Main Documentation**: https://osif.laet4x.com/
-- **Web Interface Guide**: [WEB_INTERFACE_GUIDE.md](WEB_INTERFACE_GUIDE.md)
-- **Architecture**: [.agent/architecture.md](.agent/architecture.md)
-- **Development Guide**: [.agent/development-guide.md](.agent/development-guide.md)
-- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
-- **Changelog**: [CHANGELOG.md](CHANGELOG.md)
-
-## 🔜 What's Next (v2.1.0)
-
-We're already planning the next release with exciting features:
-
-- Database persistence for investigations
-- Async API calls for 3-5x performance improvement
-- GitHub OSINT module
-- Reddit OSINT module
-- Have I Been Pwned integration
-- Enhanced authentication system
-
-See the full roadmap in [.agent/feature-planning.md](.agent/feature-planning.md)
-
-## 🙏 Contributors
-
-Special thanks to everyone who contributed to this release:
-
-- @laet4x - Core development and web interface
-- @cadeath - Contributions and testing
-- @benemohamed - Tomba integration
-- All community contributors and testers
-
-## 💬 Feedback & Support
-
-- **Issues**: [GitHub Issues](https://github.com/fr4nc1stein/osint-framework/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/fr4nc1stein/osint-framework/discussions)
-- **Documentation**: https://osif.laet4x.com/
-
-## 📄 License
-
-OSIF is licensed under AGPL v3. See [LICENSE.md](LICENSE.md) for details.
+**Release date:** 2026-07-16  
+**Branch:** `feature/v2`
 
 ---
 
-**Full Changelog**: https://github.com/fr4nc1stein/osint-framework/compare/v1.1.1...v2.0.0
+## Overview
 
-**Download**: [v2.0.0 Release](https://github.com/fr4nc1stein/osint-framework/releases/tag/v2.0.0)
+OSIF v2.0.0 is a full platform rewrite. The Metasploit-style CLI is retained. Everything else is new.
+
+The new platform is an API-first, async, containerised investigation workspace built on:
+- **FastAPI** async backend (Python 3.12, SQLAlchemy 2.0, Pydantic v2)
+- **arq + Redis** async task queue for parallel OSINT module execution
+- **PostgreSQL** with JSONB for flexible indicator metadata
+- **MinIO** S3-compatible object store for evidence files
+- **Vue 3 + Cytoscape.js** investigation workspace frontend
+- **Docker Compose** — 8-service stack, production-hardened
+
+---
+
+## What's Included
+
+### Core Platform
+
+- FastAPI app with Alembic auto-migrate on startup
+- WebSocket real-time scan progress (`/ws/scan/{scan_id}`)
+- arq worker pool for non-blocking OSINT execution
+- Redis result caching (per-module TTL) and rate limiting (token bucket)
+- Scan templates — reusable module presets
+- Export: JSON, CSV, GraphML
+- Production `docker-compose.yaml`:
+  - Resource limits per service
+  - Redis `--requirepass` auth
+  - MinIO bucket provisioned by `minio-init`
+  - Healthcheck-gated startup ordering
+  - Log rotation (json-file driver)
+  - No source volume mounts
+
+### OSINT Modules (11)
+
+| Module | Input | External API |
+|---|---|---|
+| `dns_records` | domain | — |
+| `subdomain_enum` | domain | — |
+| `whois_lookup` | domain | — |
+| `urlscan_lookup` | domain | URLScan |
+| `email_hunter` | domain | Tomba |
+| `virustotal_domain` | domain | VirusTotal |
+| `ip_geolocation` | ip | — |
+| `abuseipdb` | ip | AbuseIPDB |
+| `shodan_lookup` | ip | Shodan |
+| `email_domain` | email | — |
+| `hibp_breach` | email | HIBP |
+
+### Case & Investigation Workspace (Phase 3.1)
+
+- Case management with status, severity, priority, assignment, client, jurisdiction, tags
+- Case knowledge graph — Cytoscape.js unified view of all scan indicators
+- Hierarchical scan relationships (parent → child)
+- Case-scoped reports: Markdown, Text, HTML, PDF
+- Report snapshots — frozen at generation time
+- Investigation notes
+- Dark/light theme
+- Integration marketplace UI with provider health cards
+- AI Analyst chat (Anthropic, OpenAI, Ollama)
+- Dashboard analytics and global search
+
+### Encrypted Credentials (Phase 3.2)
+
+- Fernet-encrypted integration credentials in PostgreSQL
+- DB-first lookup with `.env` fallback for migration compatibility
+- Secrets never returned after save
+- AI settings (provider, model, base URL, temperature) stored encrypted
+- HTML + PDF report renderer via ReportLab
+
+### PI / Skip Tracing Workspace (Phase 3.4)
+
+All 8 sub-plans complete:
+
+**A — Manual entities**
+- Create persons, aliases, phones, addresses, social profiles, companies, vehicles, documents on the case graph
+- Properties stored as JSONB; entity type drives UI icon, color, and module compatibility
+
+**B — Evidence / MinIO**
+- Upload files to MinIO (`osif-evidence` bucket); SHA-256 hash; image thumbnail generation
+- Link URL/note/screenshot evidence to any node, edge, timeline event, report, or scan
+- Evidence preview, download, and thumbnail proxied through backend API (never direct MinIO URLs)
+
+**C — Timeline**
+- Case event log with 16 event types
+- Create events manually or from graph node, evidence item, or scan
+- Events with location entity appear on the Map tab
+
+**D — Map view**
+- Leaflet/Mapbox markers for location entities, address observations, IP geolocation results, sightings
+- Marker panel with jump links to Graph, Evidence, and Timeline tabs
+- Create new location nodes directly from the map
+
+**E — Geolocation editing**
+- Set/edit location from node panel or map
+- Drag manual entity markers with explicit save step
+- Normalized `case_geolocations` table for multi-observation triangulation
+- Mapbox geocoding abstraction with external-submission consent gate
+
+**F — Leads review workflow**
+- Scan-derived indicators and edges default to `needs_review`
+- Actions: promote, merge, confirm, reject, follow-up, stale
+- Bulk operations with confirmation on bulk reject
+- Rejected leads hidden from default graph and map (auditable with `include_rejected=true`)
+
+**G — Scan from node**
+- Launch enrichment scans from any manual or promoted node in the graph
+- Entity-type → OSINT module mapping with kind normalization
+- Scan results written back as reviewable leads with provenance fields:
+  `launch_source`, `source_node_type`, `source_node_id`, `source_node_label`
+
+**H — Dossier tab + PI reports**
+- Intelligence-briefing layout: subject hero, confirmed entities, verified relationships, location board, timeline highlights, evidence locker, open leads, scan provenance
+- Subject tagging: `properties.subject_profile = true` on a manual entity
+- Sensitive evidence gated behind `include_sensitive=true`
+- Dossier report type added to Markdown, HTML, and PDF renderers
+
+---
+
+## New Database Tables
+
+```
+scan_templates
+integration_credentials
+ai_settings
+case_entities
+case_relationships
+case_evidence
+case_evidence_links
+case_timeline_events
+case_timeline_links
+case_geolocations
+case_lead_reviews
+```
+
+Total tables: 21+
+
+---
+
+## New API Endpoints (selected)
+
+```
+GET/POST   /api/v1/cases/{id}/entities
+PUT/DELETE /api/v1/cases/{id}/entities/{eid}
+GET/POST   /api/v1/cases/{id}/relationships
+PUT/DELETE /api/v1/cases/{id}/relationships/{rid}
+GET/POST   /api/v1/cases/{id}/evidence
+POST       /api/v1/cases/{id}/evidence/upload
+GET        /api/v1/cases/{id}/evidence/{eid}/download
+GET        /api/v1/cases/{id}/evidence/{eid}/thumbnail
+GET/POST   /api/v1/cases/{id}/timeline
+GET        /api/v1/cases/{id}/map
+GET        /api/v1/cases/{id}/leads
+PATCH      /api/v1/cases/{id}/leads/{type}/{id}
+GET        /api/v1/cases/{id}/dossier
+GET        /api/v1/cases/{id}/graph
+GET/PUT    /api/v1/integrations/{provider}
+POST       /api/v1/integrations/{provider}/test
+GET/PUT    /api/v1/ai/settings
+POST       /api/v1/ai/test
+```
+
+Total endpoints: 60+
+
+---
+
+## Port Mapping
+
+| Service | Host port |
+|---|---|
+| Frontend | 3000 |
+| Backend API | 6000 |
+| PostgreSQL | 5434 |
+| Redis | 6381 |
+| MinIO API | 9100 |
+| MinIO Console | 9101 |
+
+---
+
+## Statistics
+
+- Docker services: 8
+- Database tables: 21+
+- API endpoints: 60+
+- OSINT modules: 11
+- Frontend views: 10+
+- Case workspace tabs: 9 (Graph, Timeline, Evidence, Leads, Map, Dossier, Scans, Notes, Reports)
+
+---
+
+## Breaking Changes from v1.5.0
+
+The Flask + vis.js web interface (`web_server.py`, port 5001) is removed. The CLI itself is unchanged.
+
+Migration path: there is no data migration from v1.5.0. Start fresh with `docker-compose up -d --build`.
+
+---
+
+## Known Limitations
+
+- No user authentication or multi-tenant access control in this release (single-team deployment assumed)
+- AI Analyst requires a separately provisioned LLM API key
+- Mapbox geocoding requires a Mapbox token; the map renders in fallback mode without one
+- PDF report generation depends on `reportlab` in the backend image
+
+---
+
+## Full Changelog
+
+See [CHANGELOG.md](../CHANGELOG.md).

@@ -7,175 +7,155 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.0.0] - 2026-05-13
+## [2.0.0] - 2026-07-16
 
-### 🎉 Major Release - Web Interface & Enhanced Features
+### Major Release — Enterprise OSINT Web Workspace
 
-This is a major release introducing a completely new web-based graph visualization interface alongside the traditional CLI, transforming OSIF into a dual-interface OSINT platform.
+Complete rewrite of OSIF as a full-stack, API-first enterprise investigation platform. The Metasploit-style CLI is retained alongside the new workspace.
 
-### ✨ Added
+---
 
-#### Web Graph Visualization
-- **Interactive Graph Interface**: Maltego-style web visualization for OSINT investigations
-- **Real-time Entity Linking**: Automatic discovery and linking of related entities
-- **Multiple Entry Points**: Support for domain, IP, email, and Bitcoin address investigations
-- **Node Interaction**: Click to view details, double-click to investigate further
-- **Export Capabilities**: Export investigation graphs as JSON
-- **Modern UI**: Responsive design with vis.js graph rendering
-- **Background Server Management**: Automatic web server startup with CLI
+### Added
 
-#### Intelligence Gathering
-- **AbuseIPDB Integration**: IP reputation checking with abuse confidence scores
-  - Threat level classification (Low/Medium/High Risk)
-  - Recent abuse report history
-  - CLI module (`modules/ioc/abuseipdb.py`)
-  - Web integration with automatic threat node creation
-- **Certificate Transparency**: Subdomain discovery via crt.sh integration
-- **Enhanced Domain Investigation**: Email discovery, DNS records, subdomain enumeration
-- **IP Geolocation**: Integration with ip-api.com for location data
-- **Email Discovery**: Tomba integration for comprehensive email finding
+#### Core Platform (Phase 1–2)
+- FastAPI async backend with Alembic migrations run automatically on startup
+- PostgreSQL + SQLAlchemy 2.0 with JSONB for flexible metadata
+- arq + Redis async task queue for parallel OSINT module execution
+- WebSocket real-time scan progress (`/ws/scan/{scan_id}`)
+- Vue 3 frontend (Vite + Pinia + Vue Router + TailwindCSS)
+- Cytoscape.js Maltego-style interactive graph visualization
+- Docker Compose stack: postgres, redis, minio, minio-init, backend, worker, frontend, console
+- Production `docker-compose.yaml` with resource limits, Redis auth, healthcheck-gated startup, log rotation
 
-#### Developer Experience
-- **Comprehensive Documentation**: 1,819 lines of developer documentation
-  - `.agent/architecture.md` - Complete system architecture (503 lines)
-  - `.agent/feature-planning.md` - Roadmap and priorities (496 lines)
-  - `.agent/development-guide.md` - Coding standards and workflows (616 lines)
-  - `.agent/README.md` - Documentation overview (204 lines)
-- **Contributing Guide**: Professional 417-line contribution guidelines
-- **Improved README**: Enhanced header with badges, navigation, and structure
+#### OSINT Engine (Phase 3)
+- Auto-linker service — detects multi-module corroborations and infers transitive relationships
+- Redis result caching per module with configurable TTL
+- Per-API rate limiting backed by Redis (token bucket)
+- Scan templates — reusable module presets
+- Export formats: JSON, CSV, GraphML
 
-#### Infrastructure
-- **Smart Port Management**: Automatic port conflict detection and increment (5001-5005)
-  - Clear error messages showing which ports are in use
-  - Auto-increment to next available port
-  - Manual port selection via `--port` flag
-- **Web Server**: Flask-based REST API with CORS support
-- **Quick Start Script**: `start_web.sh` for easy web interface launch
+#### Case & Investigation Workspace (Phase 3.1)
+- Case management — create, edit, status/severity/assignment workflow
+- Case knowledge graph — unified view merging all scan indicators
+- Hierarchical scan relationships (parent → child scans)
+- Case-scoped reports — markdown, text, HTML, and PDF (ReportLab)
+- Report snapshots — frozen at generation time
+- Investigation notes (CRUD)
+- Dark/light theme with CSS variable design system
+- Integration marketplace UI
+- AI Analyst chat interface (Anthropic, OpenAI, Ollama)
+- Dashboard analytics and global search
 
-### 🔧 Changed
+#### Encrypted Credentials (Phase 3.2)
+- Encrypted integration credentials stored in PostgreSQL (Fernet via `APP_ENCRYPTION_KEY`)
+- DB-first credential lookup with `.env` fallback for migration compatibility
+- Integration test/save/delete API — secrets never returned after save
+- Configurable AI settings (provider, model, base URL, temperature) stored encrypted in DB
+- First-run setup banner with environment import
+- HTML + PDF report renderer via ReportLab
 
-- **README.md**: Complete header redesign with centered layout, additional badges, and navigation
-- **Module System**: Enhanced with better error handling and API key validation
-- **CLI Interface**: Now includes background web server management
-- **Configuration**: Enhanced `.env.example` with AbuseIPDB and additional API keys
+#### PI / Skip Tracing Workspace (Phase 3.4)
+- **Manual entities** — create persons, aliases, phones, addresses, social profiles, companies, vehicles, documents directly on the case graph
+- **Manual relationships** — connect any two graph nodes (manual ↔ manual, manual ↔ scan indicator)
+- **Case knowledge graph merge** — scan indicators + manual entities + manual relationships in one unified graph with `graph_node_type` discriminator
+- **Evidence attachments** — upload files to MinIO, link URL/note/screenshot evidence to any node, edge, timeline event, report, or scan; SHA-256 hashing; image thumbnail generation
+- **Timeline** — case event log with manual creation and creation from node/evidence/scan; distinct icons per event type
+- **Map view** — Leaflet/Mapbox markers for location entities, address observations, IP geolocation results, and timeline sightings; marker filtering; graph/evidence/timeline jump links
+- **Geolocation editing** — set/edit location from node panel or map; drag manual markers with explicit save; normalized `case_geolocations` table for multi-observation triangulation; Mapbox geocoding abstraction with external-submission consent gate
+- **Leads review workflow** — scan-derived indicators and edges default to `needs_review`; promote, merge, confirm, reject, follow-up, or stale actions; bulk operations; rejected leads hidden from default graph and map
+- **Scan from node** — launch enrichment scans directly from any manual or promoted node; entity-type → module mapping with kind normalization; scan results written back as reviewable leads with provenance fields
+- **Dossier tab** — intelligence-briefing layout: subject hero, confirmed entities, verified relationships, location board, timeline highlights, evidence locker, open leads, scan provenance; sensitive evidence gated behind `include_sensitive=true`
+- **PI reports** — dossier report type added to Markdown, HTML, and PDF renderers; includes subject profile, verified relationships, locations, timeline, evidence index, open leads, scan provenance
 
-### 📦 Dependencies
+#### New Database Tables
+- `scan_templates`
+- `integration_credentials`
+- `ai_settings`
+- `case_entities`
+- `case_relationships`
+- `case_evidence`
+- `case_evidence_links`
+- `case_timeline_events`
+- `case_timeline_links`
+- `case_geolocations`
+- `case_lead_reviews`
 
-#### New Dependencies
-- `flask>=2.3.0` - Web framework
-- `flask-cors>=4.0.0` - CORS support
-- `requests>=2.31.0` - HTTP client (version bump)
-
-### 🗂️ File Structure
-
-#### New Files
-- `web_server.py` - Flask-based graph visualization server (505 lines)
-- `static/js/graph.js` - Interactive graph rendering (782 lines)
-- `static/js/app.js` - Frontend application logic (558 lines)
-- `static/css/style.css` - Modern UI styling (387 lines)
-- `templates/index.html` - Main web interface (105 lines)
-- `modules/ioc/abuseipdb.py` - AbuseIPDB CLI module (107 lines)
-- `WEB_INTERFACE_GUIDE.md` - Comprehensive web UI guide (307 lines)
-- `start_web.sh` - Quick start script (53 lines)
-- `CHANGELOG.md` - This file
-- `.agent/` directory - Developer documentation (4 files)
-- `screenshots/web_graph.png` - Web interface screenshot
-
-### 📊 Statistics
-
-- **Total Lines Added**: 5,548+
-- **New Files**: 19
-- **Documentation**: 2,543 lines
-- **Code**: 3,005+ lines
-
-### 🔗 API Integrations
-
-#### New Integrations
-- AbuseIPDB (IP reputation)
-- crt.sh (Certificate Transparency)
-- ip-api.com (IP geolocation)
-
-#### Enhanced Integrations
-- Tomba (email discovery)
-- DNS resolution (A, MX records)
-- Blockchain.info (Bitcoin data)
-
-### 🎯 Investigation Capabilities
-
-#### Domain Investigation
-- Email discovery (Tomba)
-- DNS records (A, MX)
-- Subdomain enumeration (Certificate Transparency)
-- Automatic IP resolution for discovered hosts
-
-#### IP Investigation
-- Geolocation and ISP information
-- Reputation checking (AbuseIPDB)
-- Port scanning (Shodan)
-- Hostname discovery
-- Threat level indicators
-
-#### Email Investigation
-- Domain extraction and linking
-- Breach checking preparation (HIBP ready)
-
-#### Bitcoin Investigation
-- Wallet balance checking
-- Transaction history
-
-### 🚀 Usage
-
-#### Web Interface
-```bash
-./start_web.sh
-# or
-python3 web_server.py
-# Then open http://localhost:5001
+#### New API Endpoints (selected)
+```
+GET/POST   /api/v1/cases/{id}/entities
+PUT/DELETE /api/v1/cases/{id}/entities/{eid}
+GET/POST   /api/v1/cases/{id}/relationships
+PUT/DELETE /api/v1/cases/{id}/relationships/{rid}
+GET/POST   /api/v1/cases/{id}/evidence
+POST       /api/v1/cases/{id}/evidence/upload
+GET        /api/v1/cases/{id}/evidence/{eid}/download
+GET        /api/v1/cases/{id}/evidence/{eid}/thumbnail
+GET/POST   /api/v1/cases/{id}/timeline
+GET        /api/v1/cases/{id}/map
+GET        /api/v1/cases/{id}/leads
+PATCH      /api/v1/cases/{id}/leads/{type}/{id}
+GET        /api/v1/cases/{id}/dossier
+GET        /api/v1/cases/{id}/graph
+GET/PUT    /api/v1/integrations/{provider}
+POST       /api/v1/integrations/{provider}/test
+GET/PUT    /api/v1/ai/settings
+POST       /api/v1/ai/test
 ```
 
-#### CLI with Web Server
-```bash
-./osif  # Web server starts automatically
-```
+---
 
-#### CLI without Web Server
-```bash
-./osif --no-web
-```
+### OSINT Modules (11)
 
-### 📝 Documentation
+| Module | Category | API Key |
+|---|---|---|
+| `dns_records` | domain | — |
+| `subdomain_enum` | domain | — |
+| `whois_lookup` | domain | — |
+| `urlscan_lookup` | domain | — |
+| `email_hunter` | domain | Tomba |
+| `virustotal_domain` | domain | VirusTotal |
+| `ip_geolocation` | ip | — |
+| `abuseipdb` | ip | AbuseIPDB |
+| `shodan_lookup` | ip | Shodan |
+| `email_domain` | email | — |
+| `hibp_breach` | email | — |
 
-- Full documentation: https://osif.laet4x.com/
-- Web Interface Guide: `WEB_INTERFACE_GUIDE.md`
-- Architecture: `.agent/architecture.md`
-- Development Guide: `.agent/development-guide.md`
-- Contributing: `CONTRIBUTING.md`
+---
 
-### 🙏 Contributors
+### Statistics
+- **Branch**: `feature/v2`
+- **Docker services**: 8
+- **Database tables**: 21+
+- **API endpoints**: 60+
+- **OSINT modules**: 11
+- **Frontend views**: 10+
+- **Case workspace tabs**: Graph, Timeline, Evidence, Leads, Map, Dossier, Scans, Notes, Reports
 
-Special thanks to all contributors who made this release possible:
-- @laet4x - Core development
-- @cadeath - Contributions
-- @benemohamed - Tomba integration
-- Community contributors
+---
 
-### 🔜 What's Next (v2.1.0)
+## [1.5.0] - 2026-05-13
 
-Planned features for the next release:
-- Database persistence for investigations
-- Async API calls for better performance
-- GitHub OSINT module
-- Reddit OSINT module
-- Have I Been Pwned integration
-- Enhanced authentication system
+### Web Graph Visualization — v1 Addition
+
+Added interactive web interface to the original CLI tool.
+
+### Added
+- Interactive graph interface (Flask + vis.js)
+- AbuseIPDB IP reputation integration
+- Subdomain discovery via Certificate Transparency (crt.sh)
+- Smart port conflict detection (5001–5005)
+- AbuseIPDB CLI module (`modules/ioc/abuseipdb.py`)
+- Web server (`web_server.py`) — Flask REST API with CORS
+- Quick start script (`start_web.sh`)
+- Developer documentation (`.agent/` — 1,819 lines)
+- Contributing guide (`CONTRIBUTING.md`)
 
 ---
 
 ## [1.1.1] - Previous Release
 
 ### Changed
-- Various bug fixes and improvements
-- Module enhancements
+- Various bug fixes and module improvements
 
 ---
 
@@ -197,7 +177,8 @@ Planned features for the next release:
 
 ---
 
-[2.0.0]: https://github.com/fr4nc1stein/osint-framework/compare/v1.1.1...v2.0.0
+[2.0.0]: https://github.com/fr4nc1stein/osint-framework/compare/v1.5.0...v2.0.0
+[1.5.0]: https://github.com/fr4nc1stein/osint-framework/compare/v1.1.1...v1.5.0
 [1.1.1]: https://github.com/fr4nc1stein/osint-framework/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/fr4nc1stein/osint-framework/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/fr4nc1stein/osint-framework/releases/tag/v1.0.0

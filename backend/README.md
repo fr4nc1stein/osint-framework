@@ -128,6 +128,61 @@ pytest --cov=app tests/
 pytest tests/unit/test_modules.py
 ```
 
+## Key API Endpoints
+
+```
+GET  /health                                       # liveness
+GET  /ready                                        # readiness (DB + Redis)
+
+# Cases
+GET/POST   /api/v1/cases
+GET/PUT    /api/v1/cases/{id}
+
+# Knowledge graph
+GET        /api/v1/cases/{id}/graph
+GET/POST   /api/v1/cases/{id}/entities
+PUT/DELETE /api/v1/cases/{id}/entities/{eid}
+GET/POST   /api/v1/cases/{id}/relationships
+PUT/DELETE /api/v1/cases/{id}/relationships/{rid}
+
+# Evidence
+GET/POST   /api/v1/cases/{id}/evidence
+POST       /api/v1/cases/{id}/evidence/upload
+GET        /api/v1/cases/{id}/evidence/{eid}/download
+GET        /api/v1/cases/{id}/evidence/{eid}/thumbnail
+GET        /api/v1/cases/{id}/evidence/{eid}/preview
+
+# Timeline
+GET/POST   /api/v1/cases/{id}/timeline
+PUT/DELETE /api/v1/cases/{id}/timeline/{tid}
+
+# Map + Geolocation
+GET        /api/v1/cases/{id}/map
+
+# Leads review
+GET        /api/v1/cases/{id}/leads
+PATCH      /api/v1/cases/{id}/leads/{type}/{lid}
+
+# Dossier
+GET        /api/v1/cases/{id}/dossier
+
+# Scans
+GET/POST   /api/v1/scans
+GET        /api/v1/scans/{id}
+GET        /api/v1/cases/{id}/scans
+
+# Integrations
+GET/PUT    /api/v1/integrations/{provider}
+POST       /api/v1/integrations/{provider}/test
+
+# AI
+GET/PUT    /api/v1/ai/settings
+POST       /api/v1/ai/test
+POST       /api/v1/ai/chat
+```
+
+Full interactive docs at http://localhost:6000/api/docs.
+
 ## Health Checks
 
 - `/health` - Liveness probe (always returns 200)

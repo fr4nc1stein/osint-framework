@@ -1,134 +1,145 @@
-# OSIF v2.0 - Quick Start Guide
+# OSIF v2.0 — Quick Start
 
-## 🚀 One-Command Setup
-
-Everything is automated! Just run:
+## One-Command Setup
 
 ```bash
-cd /Users/alfrancis/Desktop/Projects/osint-framework
-
-# Start all services (migrations run automatically)
-docker-compose -f docker-compose.dev.yml up -d
+git clone https://github.com/fr4nc1stein/osint-framework osif
+cd osif
+git checkout feature/v2
+cp backend/.env.example .env
+docker-compose -f docker-compose.dev.yml up -d --build
 ```
 
-That's it! The system will:
-- ✅ Start PostgreSQL and Redis
-- ✅ Wait for databases to be ready
-- ✅ Run database migrations automatically
-- ✅ Start the FastAPI server on port **6000**
+The stack starts automatically:
+- Waits for PostgreSQL and Redis to be healthy
+- Provisions the MinIO `osif-evidence` bucket
+- Runs all Alembic migrations
+- Starts backend API on port 6000
+- Serves the frontend on port 3000
 
-## 📊 View Logs
+## Verify All Services
 
 ```bash
-# Watch initialization process
-docker-compose -f docker-compose.dev.yml logs -f backend
-
-# You should see:
-# 🚀 OSIF v2.0 Backend - Starting initialization...
-# ⏳ Waiting for PostgreSQL...
-# ✅ PostgreSQL is ready!
-# ⏳ Waiting for Redis...
-# ✅ Redis is ready!
-# 🔄 Running database migrations...
-# ✅ Migrations complete!
-# 🎯 Starting application...
+docker-compose -f docker-compose.dev.yml ps
 ```
 
-## 🧪 Test the API
+```
+NAME              STATUS         PORTS
+osif_postgres     Up (healthy)   0.0.0.0:5434->5432/tcp
+osif_redis        Up (healthy)   0.0.0.0:6381->6379/tcp
+osif_minio        Up (healthy)   0.0.0.0:9100->9000/tcp, 0.0.0.0:9101->9001/tcp
+osif_minio_init   Exited (0)
+osif_backend      Up             0.0.0.0:6000->6000/tcp
+osif_worker       Up
+osif_frontend     Up             0.0.0.0:3000->80/tcp
+osif_console      Up
+```
+
+## Open the UI
+
+| Interface | URL |
+|---|---|
+| Investigation Dashboard | http://localhost:3000 |
+| API Docs (Swagger) | http://localhost:6000/api/docs |
+| MinIO Console | http://localhost:9101 |
+
+## Case Workspace Tabs
+
+Once you open a case at http://localhost:3000/cases, you get:
+
+| Tab | What it does |
+|---|---|
+| **Graph** | Interactive Cytoscape.js knowledge graph — scan indicators + manual entities + relationships |
+| **Timeline** | Chronological event log linked to entities, evidence, and scans |
+| **Evidence** | File upload library backed by MinIO — attach screenshots, PDFs, images to any node |
+| **Leads** | Review queue for scan-derived findings — promote, reject, or merge into confirmed entities |
+| **Map** | Location markers for address/location entities, IP geolocation results, and sightings |
+| **Dossier** | Subject intelligence briefing — confirmed entities, relationships, locations, open leads |
+| **Scans** | Hierarchical scan list — parent/child relationships, provenance badges |
+| **Notes** | Investigation notes |
+| **Reports** | Generate and download Markdown, HTML, or PDF reports including PI dossier format |
+
+## Quick API Test
 
 ```bash
 # Health check
 curl http://localhost:6000/health
 
-# List available OSINT modules
-curl http://localhost:6000/api/v1/modules
+# List OSINT modules
+curl http://localhost:6000/api/v1/modules | jq '[.[] | .module_id]'
 
-# Create a test case
+# Create a case
 curl -X POST http://localhost:6000/api/v1/cases \
   -H "Content-Type: application/json" \
-  -d '{
-    "title": "My First Investigation",
-    "description": "Testing OSIF v2.0",
-    "priority": "high"
-  }'
+  -d '{"title": "My First Investigation", "description": "Testing OSIF v2.0", "priority": "high"}'
+
+# Launch a scan
+curl -X POST http://localhost:6000/api/v1/scans \
+  -H "Content-Type: application/json" \
+  -d '{"seed_value": "example.com", "seed_kind": "domain", "modules": ["dns_records", "whois_lookup"]}'
 ```
 
-## 📖 API Documentation
-
-Open in your browser:
-- **Swagger UI**: http://localhost:6000/api/docs
-- **ReDoc**: http://localhost:6000/api/redoc
-
-## 🛑 Stop Services
+## CLI Console
 
 ```bash
+docker exec -it osif_console ./osif
+```
+
+## View Logs
+
+```bash
+# All services
+docker-compose -f docker-compose.dev.yml logs -f
+
+# Backend + worker only
+docker-compose -f docker-compose.dev.yml logs -f backend worker
+```
+
+## Stop
+
+```bash
+# Keep data volumes
 docker-compose -f docker-compose.dev.yml down
-```
 
-## 🔧 Rebuild After Code Changes
-
-```bash
-# Rebuild and restart
-docker-compose -f docker-compose.dev.yml up -d --build
-```
-
-## 📝 Environment Variables
-
-To configure API keys:
-
-```bash
-# Copy example file
-cp backend/.env.example backend/.env
-
-# Edit with your API keys
-nano backend/.env
-```
-
-Then restart:
-```bash
-docker-compose -f docker-compose.dev.yml restart backend
-```
-
-## 🐛 Troubleshooting
-
-### Port 6000 already in use?
-
-```bash
-# Check what's using the port
-lsof -i :6000
-
-# Kill the process or change the port in docker-compose.dev.yml
-```
-
-### Database connection issues?
-
-```bash
-# Check PostgreSQL is running
-docker-compose -f docker-compose.dev.yml ps postgres
-
-# View PostgreSQL logs
-docker-compose -f docker-compose.dev.yml logs postgres
-```
-
-### Reset everything?
-
-```bash
-# Stop and remove all data
+# Wipe everything (fresh start)
 docker-compose -f docker-compose.dev.yml down -v
-
-# Start fresh
-docker-compose -f docker-compose.dev.yml up -d
 ```
 
-## 📚 Next Steps
+## Rebuild After Changes
 
-1. **Explore API**: http://localhost:6000/api/docs
-2. **Read Backend Docs**: `backend/README.md`
-3. **Check Architecture**: `docs/architecture.md`
-4. **View Spec**: `docs/spec.md`
+```bash
+docker-compose -f docker-compose.dev.yml up -d --build
+
+# Single service
+docker-compose -f docker-compose.dev.yml up -d --build backend
+```
+
+## Troubleshooting
+
+**Port already in use:**
+```bash
+lsof -i :6000   # or :3000, :5434, :6381, :9100
+```
+Change host-side ports in `docker-compose.dev.yml` to resolve conflicts.
+
+**Database not ready:**
+```bash
+docker-compose -f docker-compose.dev.yml logs postgres
+docker-compose -f docker-compose.dev.yml exec postgres psql -U osif -c "\dt"
+```
+
+**Run migration manually:**
+```bash
+docker-compose -f docker-compose.dev.yml exec backend alembic upgrade head
+```
+
+**Reset MinIO bucket:**
+```bash
+docker-compose -f docker-compose.dev.yml run --rm minio-init
+```
 
 ---
 
-**Port:** 6000  
-**Auto-migrations:** ✅ Enabled  
-**Hot-reload:** ✅ Enabled (development mode)
+**Backend API:** http://localhost:6000  
+**Frontend:** http://localhost:3000  
+**Docs:** http://localhost:6000/api/docs

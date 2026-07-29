@@ -63,30 +63,65 @@ We actively welcome your pull requests:
 
 ### Prerequisites
 
-- Python 3.12 or higher
+- Docker and Docker Compose
+- Node.js 20+ (for frontend-only development)
+- Python 3.12+ (for backend-only development)
 - Git
-- Virtual environment support
 
-### Setup Steps
+### Full Stack (Recommended)
 
 ```bash
 # 1. Fork and clone the repository
 git clone https://github.com/YOUR_USERNAME/osint-framework.git
 cd osint-framework
+git checkout feature/v2
 
-# 2. Activate virtual environment
-source bin/activate
+# 2. Configure environment
+cp backend/.env.example .env
+# Edit .env and set POSTGRES_PASSWORD, REDIS_PASSWORD, MINIO_ROOT_USER, MINIO_ROOT_PASSWORD
 
-# 3. Install dependencies
+# 3. Start the full stack (migrations run automatically)
+docker-compose -f docker-compose.dev.yml up -d --build
+
+# 4. Open the UI
+open http://localhost:3000
+# API docs: http://localhost:6000/api/docs
+```
+
+### Backend-Only (Local)
+
+```bash
+cd backend
 pip install -r requirements.txt
-
-# 4. Configure environment
 cp .env.example .env
-# Edit .env with your API keys
 
-# 5. Test the installation
-./osif --help
-python3 web_server.py
+# Start supporting services
+docker-compose -f ../docker-compose.dev.yml up -d postgres redis minio minio-init
+
+# Run migrations
+alembic upgrade head
+
+# Start API server with reload
+uvicorn app.main:app --reload --host 0.0.0.0 --port 6000
+```
+
+### Frontend-Only (Local)
+
+```bash
+cd frontend
+npm install
+# Ensure backend is running at localhost:6000
+npm run dev   # http://localhost:5173
+```
+
+### CLI Console
+
+```bash
+# Attach to the running console container
+docker exec -it osif_console ./osif
+
+# Or build and run standalone
+docker-compose -f docker-compose.dev.yml run --rm console ./osif
 ```
 
 ### Developer Documentation
@@ -212,123 +247,92 @@ docs: update API documentation for domain investigation
 
 ## 🔧 Module Development
 
-### Creating a New Module
+### Creating a New OSINT Module (v2)
 
-Modules are organized by category in the `modules/` directory:
+Backend OSINT modules live in `backend/app/modules/<category>/`.
 
-```
-modules/
-├── attack-surface/
-├── blockchain/
-├── email/
-├── geolocation/
-├── host_enum/
-├── ioc/
-├── mobile/
-├── source-code/
-└── web_enum/
-```
+Categories: `domain`, `ip`, `email`, `username`, `phone`, `bitcoin`
 
 ### Module Template
 
 ```python
-from sploitkit import *
-from dotenv import load_dotenv
-from terminaltables import SingleTable
-import os
-import requests
+from app.modules.base import BaseOSINTModule
+from app.modules.registry import register_module
 
-class YourModuleName(Module):
-    """Brief description of what this module does
-    
-    Author:  your-name
-    Version: 1.0
-    """
-    load_dotenv()
-    API_KEY = os.getenv('YOUR_API_KEY')
+@register_module
+class YourModule(BaseOSINTModule):
+    MODULE_ID = "your_module"
+    DISPLAY_NAME = "Your Module"
+    DESCRIPTION = "What this module does"
+    CATEGORY = "domain"          # or ip, email, username, phone, bitcoin
+    ACCEPTS = ["domain"]         # seed_kind values this module handles
 
-    config = Config({
-        Option(
-            'TARGET',
-            "Description of target parameter",
-            True,  # Required
-        ): str("default-value"),
-    })    
+    async def execute(self, target: str, kind: str, **kwargs) -> list[dict]:
+        api_key = await self.get_credential("YOUR_API_KEY_NAME")
+        if not api_key:
+            return []
 
-    def run(self):
-        """Main execution logic"""
-        if not self.API_KEY:
-            self.logger.error("API key not configured")
-            return
-
-        target = self.config.option('TARGET').value
-        
-        try:
-            results = self.investigate(target)
-            self.display_results(results)
-        except Exception as e:
-            self.logger.error(f"Error: {e}")
-    
-    def investigate(self, target: str) -> dict:
-        """Perform the investigation"""
-        # Implementation
-        pass
-    
-    def display_results(self, results: dict):
-        """Display results in formatted table"""
-        table_data = [
-            ("Field", "Value"),
-            ("Target", results.get("target")),
-        ]
-        table = SingleTable(table_data, "Results")
-        print("\n" + table.table)
+        results = []
+        # ... call external API, build indicator dicts ...
+        return results
 ```
+
+The module auto-registers on backend startup. Results are written to `scan_results` and appear in the case graph.
+
+### Credential Access
+
+Integration credentials are stored encrypted in PostgreSQL. Use `self.get_credential("PROVIDER_NAME")` — it falls back to the `.env` file if no DB record exists.
 
 ### Module Checklist
 
-- [ ] Inherits from `Module` class
-- [ ] Has descriptive docstring
-- [ ] Validates API keys (if required)
-- [ ] Handles errors gracefully
-- [ ] Displays results in formatted table
-- [ ] Follows naming conventions
-- [ ] Added to appropriate category folder
+- [ ] Inherits from `BaseOSINTModule`
+- [ ] `MODULE_ID` is unique and snake_case
+- [ ] `ACCEPTS` list is accurate
+- [ ] Returns `[]` (not raises) when credential is missing
+- [ ] Returns `[]` (not raises) on API error
+- [ ] Result dicts follow the indicator schema (`type`, `value`, `metadata`)
+- [ ] Registered in the correct category folder
 
 ---
 
 ## 🧪 Testing
 
-### Manual Testing
+### Backend Tests
 
 ```bash
-# Test CLI module
-./osif
-use category/module_name
-show options
-set TARGET value
-run
+cd backend
 
-# Test web server
-python3 web_server.py
-# Open http://localhost:5001 and test
+# Run all tests
+pytest
+
+# With coverage
+pytest --cov=app tests/
+
+# Specific file
+pytest tests/unit/test_modules.py
 ```
 
-### Writing Tests (Future)
+### Manual API Testing
 
-When the test framework is implemented:
+```bash
+# Health check
+curl http://localhost:6000/health
 
-```python
-# tests/test_your_module.py
-import pytest
-from modules.category.your_module import YourModuleName
+# List modules
+curl http://localhost:6000/api/v1/modules | jq '[.[] | .module_id]'
 
-def test_module_loads():
-    module = YourModuleName()
-    assert module is not None
+# Create a case and run a scan
+curl -X POST http://localhost:6000/api/v1/cases \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Test", "description": "dev test"}'
+```
 
-def test_module_requires_api_key():
-    # Test implementation
-    pass
+### Frontend Dev
+
+```bash
+cd frontend
+npm run lint
+npm run type-check
 ```
 
 ---
